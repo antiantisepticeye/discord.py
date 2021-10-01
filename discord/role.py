@@ -29,6 +29,7 @@ from .permissions import Permissions
 from .errors import InvalidArgument
 from .colour import Colour
 from .mixins import Hashable
+from .asset import Asset
 from .utils import snowflake_time, _get_as_snowflake, MISSING
 
 __all__ = (
