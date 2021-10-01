@@ -184,11 +184,13 @@ class Role(Hashable):
         'guild',
         'tags',
         '_state',
+        '_icon',
     )
 
     def __init__(self, *, guild: Guild, state: ConnectionState, data: RolePayload):
         self.guild: Guild = guild
         self._state: ConnectionState = state
+        self._icon: Optional[str] = data.get('icon')
         self.id: int = int(data['id'])
         self._update(data)
 
@@ -243,6 +245,7 @@ class Role(Hashable):
         self.managed: bool = data.get('managed', False)
         self.mentionable: bool = data.get('mentionable', False)
         self.tags: Optional[RoleTags]
+        self._icon:str = data.get('icon')
 
         try:
             self.tags = RoleTags(data['tags'])
@@ -281,6 +284,12 @@ class Role(Hashable):
         """
         me = self.guild.me
         return not self.is_default() and not self.managed and (me.top_role > self or me.id == self.guild.owner_id)
+
+    @property
+    def icon(self) -> Asset | None:
+        if self._icon is None:
+            return None
+        return Asset._from_icon(self._state, self.id, self._icon, 'role')
 
     @property
     def permissions(self) -> Permissions:
