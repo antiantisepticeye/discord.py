@@ -288,6 +288,7 @@ class Role(Hashable):
 
     @property
     def icon(self) -> Asset | None:
+        """:class:`Asset`: Returns the role's icon if any. Returns None if no icon is found."""
         if self._icon is None:
             return None
         return Asset._from_icon(self._state, self.id, self._icon, 'role')

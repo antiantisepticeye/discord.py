@@ -50,10 +50,15 @@ import discord
 from .errors import *
 from .cooldowns import Cooldown, BucketType, CooldownMapping, MaxConcurrency, DynamicCooldownMapping
 from .converter import run_converters, get_converter, Greedy
-from ._types import _BaseCommand
 from .cog import Cog
 from .context import Context
 
+from discord.interactions import Interaction
+from discord.slash_options import SlashCommandOption
+from ._types import _BaseCommand
+from .slash_command import SlashCommand, SlashCommandGroup
+from .message_command import MessageCommand
+from .user_command import UserCommand
 
 if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec, TypeGuard
@@ -73,6 +78,8 @@ __all__ = (
     'Command',
     'Group',
     'GroupMixin',
+    'SlashCommand',
+    'SlashCommandOption',
     'command',
     'group',
     'has_role',
@@ -1125,6 +1132,161 @@ class Command(_BaseCommand, Generic[CogT, P, T]):
         finally:
             ctx.command = original
 
+
+
+T = TypeVar('T')
+SlashCommandT = TypeVar('SlashCommandT', bound='SlashCommand')
+MessageCommandT = TypeVar('MessageCommandT', bound='MessageCommand')
+UserCommandT = TypeVar('UserCommandT', bound='UserCommand')
+InteractionT = TypeVar('InteractionT', bound='Interaction')
+
+
+
+
+def slash_command(
+    name: str = MISSING,
+    description: str = MISSING,
+    cls: Type[SlashCommandT] = MISSING,
+    **attrs: Any
+) -> Callable[
+    [
+        Callable[Concatenate[InteractionT, P], Coro[T]]
+    ]
+, Union[SlashCommand[P, T], SlashCommandT]]:
+    """A decorator that transforms a function into a :class:`.SlashCommand`
+
+    By default the ``help`` attribute is received automatically from the
+    docstring of the function and is cleaned up with the use of
+    ``inspect.cleandoc``. If the docstring is ``bytes``, then it is decoded
+    into :class:`str` using utf-8 encoding.
+
+
+    Parameters
+    -----------
+    name: :class:`str`
+        The name to create the command with. By default this uses the
+        function name unchanged.
+    cls
+        The class to construct with. By default this is :class:`.SlashCommand`.
+        You usually do not change this.
+    attrs
+        Keyword arguments to pass into the construction of the class denoted
+        by ``cls``.
+
+    Raises
+    -------
+    TypeError
+        If the function is not a coroutine or is already a command.
+    """
+    if cls is MISSING:
+        cls = SlashCommand  # type: ignore
+
+    def decorator(func:
+            Callable[Concatenate[InteractionT, P], Coro[Any]]
+        ) -> SlashCommandT:
+        if isinstance(func, SlashCommand):
+            raise TypeError('Callback is already a command.')
+        return cls(func, name=name, description=description, **attrs)
+
+    return decorator
+
+def message_command(
+    name: str = MISSING,
+    cls: Type[MessageCommandT] = MISSING,
+    **attrs: Any
+) -> Callable[
+    [
+        Callable[Concatenate[InteractionT, P], Coro[T]]
+    ]
+, Union[MessageCommand[P, T], MessageCommandT]]:
+    """A decorator that transforms a function into a :class:`.MessageCommand`
+
+    By default the ``help`` attribute is received automatically from the
+    docstring of the function and is cleaned up with the use of
+    ``inspect.cleandoc``. If the docstring is ``bytes``, then it is decoded
+    into :class:`str` using utf-8 encoding.
+
+
+    Parameters
+    -----------
+    name: :class:`str`
+        The name to create the command with. By default this uses the
+        function name unchanged.
+    cls
+        The class to construct with. By default this is :class:`.MessageCommand`.
+        You usually do not change this.
+    attrs
+        Keyword arguments to pass into the construction of the class denoted
+        by ``cls``.
+
+    Raises
+    -------
+    TypeError
+        If the function is not a coroutine or is already a command.
+    """
+    if cls is MISSING:
+        cls = MessageCommand  # type: ignore
+
+    def decorator(func:
+            Callable[Concatenate[InteractionT, P], Coro[Any]]
+        ) -> MessageCommandT:
+        if isinstance(func, MessageCommand):
+            raise TypeError('Callback is already a command.')
+        return cls(func, name=name, **attrs)
+
+    return decorator
+
+
+def user_command(
+    name: str = MISSING,
+    cls: Type[UserCommandT] = MISSING,
+    **attrs: Any
+) -> Callable[
+    [
+        Callable[Concatenate[InteractionT, P], Coro[T]]
+    ]
+, Union[UserCommand[P, T], UserCommandT]]:
+    """A decorator that transforms a function into a :class:`.UserCommand`
+
+    By default the ``help`` attribute is received automatically from the
+    docstring of the function and is cleaned up with the use of
+    ``inspect.cleandoc``. If the docstring is ``bytes``, then it is decoded
+    into :class:`str` using utf-8 encoding.
+
+
+    Parameters
+    -----------
+    name: :class:`str`
+        The name to create the command with. By default this uses the
+        function name unchanged.
+    cls
+        The class to construct with. By default this is :class:`.UserCommand`.
+        You usually do not change this.
+    attrs
+        Keyword arguments to pass into the construction of the class denoted
+        by ``cls``.
+
+    Raises
+    -------
+    TypeError
+        If the function is not a coroutine or is already a command.
+    """
+    if cls is MISSING:
+        cls = UserCommand  # type: ignore
+
+    def decorator(func:
+            Callable[Concatenate[InteractionT, P], Coro[Any]]
+        ) -> UserCommandT:
+        if isinstance(func, UserCommand):
+            raise TypeError('Callback is already a command.')
+        return cls(func, name=name, **attrs)
+
+    return decorator
+
+
+
+
+
 class GroupMixin(Generic[CogT]):
     """A mixin that implements common functionality for classes that behave
     similar to :class:`.Group` and are allowed to register commands.
@@ -1134,14 +1296,16 @@ class GroupMixin(Generic[CogT]):
     all_commands: :class:`dict`
         A mapping of command name to :class:`.Command`
         objects.
+    all_global_slash_commands: :class:`dict`
+        A mapping of slash command name to :class:`.SlashCommand`
+        objects.
+    all_guild_slash_commands: :class:`dict`
+        A mapping of guild specific guild id to a mapping of slash command name to :class:`.SlashCommand`
+        objects.
     case_insensitive: :class:`bool`
         Whether the commands should be case insensitive. Defaults to ``False``.
     """
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        case_insensitive = kwargs.get('case_insensitive', False)
-        self.all_commands: Dict[str, Command[CogT, Any, Any]] = _CaseInsensitiveDict() if case_insensitive else {}
-        self.case_insensitive: bool = case_insensitive
-        super().__init__(*args, **kwargs)
+
 
     @property
     def commands(self) -> Set[Command[CogT, Any, Any]]:
@@ -1153,6 +1317,240 @@ class GroupMixin(Generic[CogT]):
             if isinstance(command, GroupMixin):
                 command.recursively_remove_all_commands()
             self.remove_command(command.name)
+
+
+
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        case_insensitive = kwargs.get('case_insensitive', False)
+        self.all_commands:          Dict[str, Command[CogT, Any, Any]]  = _CaseInsensitiveDict() if case_insensitive else {}
+
+        self.all_global_slash_commands: Dict[str, SlashCommand[Any, Any]]            = {}
+        self.all_guild_slash_commands:  Dict[int, Dict[str, SlashCommand[Any, Any]]] = {}
+        self.all_user_commands:         Dict[str, UserCommand[Any, Any]]             = {}
+        self.all_message_commands:      Dict[str, MessageCommand[Any, Any]]          = {}
+        self.all_slash_command_groups:  Dict[str, SlashCommandGroup[Any, Any]]       = {}
+
+        self.case_insensitive: bool = case_insensitive
+        super().__init__(*args, **kwargs)
+
+    def slash_command(
+        self,
+        name: str = MISSING,
+        description: str = MISSING,
+        cls: Type[SlashCommandT] = MISSING,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Callable[[Callable[Concatenate[InteractionT, P], Coro[Any]]], SlashCommandT]:
+        """A shortcut decorator that invokes :func:`.slash_command` and adds it to
+        the internal command list via :meth:`~.GroupMixin.add_slash_command`.
+
+        Returns
+        --------
+        Callable[..., :class:`SlashCommand`]
+            A decorator that converts the provided method into a SlashCommand, adds it to the bot, then returns it.
+        """
+        def decorator(func: Callable[Concatenate[InteractionT, P], Coro[Any]]) -> SlashCommandT:
+            kwargs.setdefault('parent', self)
+            result = slash_command(name=name, description=description, cls=cls, *args, **kwargs)(func)
+            self.add_global_slash_command(result)
+            return result
+
+        return decorator
+
+    def add_global_slash_command(self, command: SlashCommand) -> None:
+        """Adds a :class:`.SlashCommand` into the internal list of slash commands.
+
+
+        Parameters
+        -----------
+        command: :class:`SlashCommand`
+            The command to add.
+
+        Raises
+        -------
+        :exc:`.CommandRegistrationError`
+            If the slash command is already registered by different command.
+        TypeError
+            If the command passed is not a subclass of :class:`.SlashCommand`.
+        """
+
+        if not isinstance(command, SlashCommand):
+            raise TypeError('The command passed must be a subclass of SlashCommand')
+
+        if isinstance(self, SlashCommand):
+            command.parent = self
+
+        if command.name in self.all_global_slash_commands:
+            raise CommandRegistrationError(command.name)
+
+        self.all_global_slash_commands[command.name] = command
+
+
+
+
+
+    def guild_slash_command(
+        self,
+        name: str = MISSING,
+        description: str = MISSING,
+        guild: Union[str, int] = ...,
+        cls: Type[SlashCommandT] = MISSING,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Callable[[Callable[Concatenate[InteractionT, P], Coro[Any]]], SlashCommandT]:
+        """A shortcut decorator that invokes :func:`.slash_command` and adds it to
+        the internal command list via :meth:`~.GroupMixin.add_guild_slash_command`.
+
+        Returns
+        --------
+        Callable[..., :class:`SlashCommand`]
+            A decorator that converts the provided method into a guild specific slash command, adds it to the bot, then returns it.
+        """
+        def decorator(func: Callable[Concatenate[InteractionT, P], Coro[Any]]) -> SlashCommandT:
+            result = slash_command(name=name, description=description, guild=guild, cls=cls, *args, **kwargs)(func)
+            self.add_guild_slash_command(result, guild=guild)
+            return result
+
+        return decorator
+
+    def add_guild_slash_command(self, command: SlashCommand, guild: Union[str, int]) -> None:
+        """Adds a :class:`.SlashCommand` list for a specific guild into the internal list of slash commands.
+
+
+        Parameters
+        -----------
+        command: :class:`SlashCommand`
+            The command to add.
+
+        guild: :class:`int`
+            The guild id to add the command to.
+
+        Raises
+        -------
+        :exc:`.CommandRegistrationError`
+            If the slash command is already registered by different command.
+        :exc:`.GuildNotFound`
+            If the guild is not found at runtime.
+        TypeError
+            If the command passed is not a subclass of :class:`.SlashCommand`.
+        
+        """
+        guild_id = int(guild)
+        if not isinstance(command, SlashCommand):
+            raise TypeError('The command passed must be a subclass of SlashCommand')
+
+        if isinstance(self, SlashCommand):
+            command.parent = self
+
+        if guild_id in self.all_guild_slash_commands.keys():
+            if command.name in self.all_guild_slash_commands[guild_id]:
+                raise CommandRegistrationError(command.name)
+
+        if self.all_guild_slash_commands.get(guild_id):
+            self.all_guild_slash_commands[guild_id][command.name] = command
+        else:
+            self.all_guild_slash_commands[guild_id] = {}
+            self.all_guild_slash_commands[guild_id][command.name] = command
+
+
+
+
+
+
+    def get_global_slash_command(self, name: str) -> Optional[SlashCommand]:
+        """Get a :class:`.SlashCommand` from the internal list
+        of slash commands.
+
+        Parameters
+        -----------
+        name: :class:`str`
+            The name of the slash command to get.
+
+        Returns
+        --------
+        Optional[:class:`SlashCommand`]
+            The slash command that was requested. If not found, returns ``None``.
+        """
+
+        # fast path, no space in name.
+        if ' ' not in name:
+            return self.all_global_slash_commands.get(name)
+
+        names = name.split()
+        if not names:
+            return None
+        obj = self.all_global_slash_commands.get(names[0])
+        if not isinstance(obj, GroupMixin):
+            return obj
+
+        for name in names[1:]:
+            try:
+                obj = obj.all_global_slash_commands[name]  # type: ignore
+            except (AttributeError, KeyError):
+                return None
+
+        return obj
+
+
+
+
+    def message_command(
+        self,
+        name: str = MISSING,
+        cls: Type[MessageCommandT] = MISSING,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Callable[[Callable[Concatenate[InteractionT, P], Coro[Any]]], MessageCommandT]:
+        """A shortcut decorator that invokes :func:`.message_command` and adds it to
+        the internal command list via :meth:`~.GroupMixin.add_message_command`.
+
+        Returns
+        --------
+        Callable[..., :class:`MessageCommand`]
+            A decorator that converts the provided method into a guild specific slash command, adds it to the bot, then returns it.
+        """
+        def decorator(func: Callable[Concatenate[InteractionT, P], Coro[Any]]) -> MessageCommandT:
+            result = message_command(name=name,cls=cls, *args, **kwargs)(func)
+            self.add_message_command(result)
+            return result
+
+        return decorator
+
+    def add_message_command(self, command: MessageCommand) -> None:
+        """Adds a :class:`.MessageCommand` to the internal list of message commands.
+
+
+        Parameters
+        -----------
+        command: :class:`MessageCommand`
+            The command to add.
+
+        Raises
+        -------
+        :exc:`.CommandRegistrationError`
+            If the message command is already registered by different command.
+        TypeError
+            If the command passed is not a subclass of :class:`.MessageCommand`.
+        
+        """
+        
+        if not isinstance(command, MessageCommand):
+            raise TypeError('The command passed must be a subclass of MessageCommand')
+
+        if isinstance(self, MessageCommand):
+            command.parent = self
+
+        if command.name in self.all_message_commands:
+            raise CommandRegistrationError(command.name)
+
+        self.all_message_commands[command.name] = command
+
+
+
+
+
+
 
     def add_command(self, command: Command[CogT, Any, Any]) -> None:
         """Adds a :class:`.Command` into the internal list of commands.
