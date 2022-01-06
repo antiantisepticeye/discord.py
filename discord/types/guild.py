@@ -66,6 +66,7 @@ class _GuildOptional(TypedDict, total=False):
     max_members: int
     premium_subscription_count: int
     max_video_channel_users: int
+    premium_progress_bar_enabled: bool
 
 
 DefaultMessageNotificationLevel = Literal[0, 1]
@@ -139,6 +140,7 @@ class Guild(_BaseGuildPreview, _GuildOptional):
     premium_tier: PremiumTier
     preferred_locale: str
     public_updates_channel_id: Optional[Snowflake]
+    premium_progress_bar_enabled: bool
 
 
 class InviteGuild(Guild, total=False):

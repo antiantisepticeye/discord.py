@@ -25,6 +25,7 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 import sys
@@ -47,6 +48,8 @@ from urllib.parse import quote as _uriquote
 import weakref
 
 import aiohttp
+
+from discord.enums import EventEntityType
 
 from .errors import HTTPException, Forbidden, NotFound, LoginFailure, DiscordServerError, GatewayNotFound, InvalidArgument
 from .gateway import DiscordClientWebSocketResponse
@@ -84,6 +87,7 @@ if TYPE_CHECKING:
         threads,
         voice,
         sticker,
+        schedule_event,
     )
     from .types.snowflake import Snowflake, SnowflakeList
 
@@ -727,6 +731,14 @@ class HTTPClient:
         }
 
         return self.request(r, params=params, reason=reason)
+
+    def timeout(self, guild_id: Snowflake, user_id: Snowflake, time: Optional[datetime] = None, *, reason: Optional[str] = None) -> Response[None]:
+
+        if time.tzinfo is None:
+            time = time.astimezone()
+        r = Route('PATCH', '/guilds/{guild_id}/members/{user_id}', guild_id=guild_id, user_id=user_id)
+        return self.request(r, json={"communication_disabled_until":time.isoformat()}, reason=reason)
+
 
     def unban(self, user_id: Snowflake, guild_id: Snowflake, *, reason: Optional[str] = None) -> Response[None]:
         r = Route('DELETE', '/guilds/{guild_id}/bans/{user_id}', guild_id=guild_id, user_id=user_id)
@@ -1531,6 +1543,84 @@ class HTTPClient:
 
     def delete_stage_instance(self, channel_id: Snowflake, *, reason: Optional[str] = None) -> Response[None]:
         return self.request(Route('DELETE', '/stage-instances/{channel_id}', channel_id=channel_id), reason=reason)
+
+    # Scheduled events management
+    
+    def get_scheduled_events(
+        self, guild_id: Snowflake, *, with_user_count: Optional[int] = None
+    ) -> Response[List[schedule_event.ScheduledEvent]]:
+        params: Dict[str, Any] = {}
+        if with_user_count is not None:
+            params['with_user_count'] = with_user_count
+
+        r = Route('GET', '/guilds/{guild_id}/scheduled-events', guild_id=guild_id)
+        return self.request(r, params=params)
+
+
+    def get_scheduled_event(self, guild_id: Snowflake, event_id: Snowflake) -> Response[schedule_event.ScheduledEvent]:
+        r = Route('GET', '/guilds/{guild_id}/scheduled-events/{event_id}', guild_id=guild_id, event_id=event_id )
+        return self.request(r)
+
+
+    def get_scheduled_event_users(self, guild_id: Snowflake, event_id: Snowflake, *, limit: Optional[int] = None, before: Optional[Snowflake] = None, after: Optional[Snowflake] = None) -> Response[List[user.User]]:
+        params: Dict[str, Any] = {}
+        if limit is not None: params['limit'] = limit
+        if after is not None: params['after'] = after
+        if before is not None: params['before'] = before
+
+        r = Route('GET', '/guilds/{guild_id}/scheduled-events/{event_id}/users', guild_id=guild_id, event_id=event_id)
+        return self.request(r, json=params)
+    
+    def delete_scheduled_event(self, guild_id: Snowflake, event_id: Snowflake) -> Response[None]:
+        return self.request(Route('DELETE', '/guilds/{guild_id}/scheduled-events/{event_id}', guild_id=guild_id, event_id=event_id))
+
+
+
+    def create_scheduled_event(
+            self,
+            guild_id: Snowflake,
+            name: str,
+            start_time: datetime,
+            entity_type: EventEntityType = EventEntityType.stage,
+
+            *,
+            channel_id: int = None,
+            location: str = None,
+            guild_only: bool = False,
+            description: str = None,
+            end_time: datetime = None,            
+        ) -> Response[schedule_event.ScheduledEvent]:
+        params = {}
+        params['name'] = name
+
+        if start_time.tzinfo is None:
+            start_time = start_time.astimezone()
+        params['scheduled_start_time'] = start_time.isoformat()
+
+        if entity_type == EventEntityType.stage.value:
+            params['channel_id'] = channel_id
+        elif entity_type == EventEntityType.voice.value:
+            params['channel_id'] = channel_id
+        elif entity_type == EventEntityType.external.value:
+            params['entity_metadata'] = {"location": location}
+
+
+        params['entity_type'] = entity_type
+        if description is not None:
+            params['description'] = description
+            
+        if end_time is not None:
+            if end_time.tzinfo is None:
+                end_time = end_time.astimezone()
+            params['scheduled_end_time'] = end_time.isoformat()
+        
+        if guild_only:
+            params['privacy_level'] = 2
+
+
+
+        r = Route('POST', '/guilds/{guild_id}/scheduled-events', guild_id=guild_id)
+        return self.request(r, json=params)
 
     # Application commands (global)
 

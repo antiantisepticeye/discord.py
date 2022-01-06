@@ -59,8 +59,6 @@ from .stage_instance import *
 from .interactions import *
 from .components import *
 from .threads import *
-from .slash_options import *
-
 
 class VersionInfo(NamedTuple):
     major: int

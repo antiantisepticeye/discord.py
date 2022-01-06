@@ -263,6 +263,7 @@ class FlagsMeta(type):
         __commands_flag_case_insensitive__: bool
         __commands_flag_delimiter__: str
         __commands_flag_prefix__: str
+        __commands_strict_bool__: bool
 
     def __new__(
         cls: Type[type],
@@ -273,6 +274,7 @@ class FlagsMeta(type):
         case_insensitive: bool = MISSING,
         delimiter: str = MISSING,
         prefix: str = MISSING,
+        strict_bool: bool = MISSING,
     ):
         attrs['__commands_is_flag__'] = True
 
@@ -305,6 +307,8 @@ class FlagsMeta(type):
                     attrs['__commands_flag_delimiter__'] = base.__dict__['__commands_flag_delimiter__']
                 if prefix is MISSING:
                     attrs['__commands_flag_prefix__'] = base.__dict__['__commands_flag_prefix__']
+                if strict_bool is MISSING:
+                    attrs['__commands_strict_bool__'] = base.__dict__['__commands_strict_bool__']
 
         if case_insensitive is not MISSING:
             attrs['__commands_flag_case_insensitive__'] = case_insensitive
@@ -312,10 +316,13 @@ class FlagsMeta(type):
             attrs['__commands_flag_delimiter__'] = delimiter
         if prefix is not MISSING:
             attrs['__commands_flag_prefix__'] = prefix
+        if strict_bool is not MISSING:
+            attrs['__commands_strict_bool__'] = strict_bool
 
         case_insensitive = attrs.setdefault('__commands_flag_case_insensitive__', False)
         delimiter = attrs.setdefault('__commands_flag_delimiter__', ':')
         prefix = attrs.setdefault('__commands_flag_prefix__', '')
+        strict_bool = attrs.setdefault('__commands_strict_bool__', False)
 
         for flag_name, flag in get_flags(attrs, global_ns, local_ns).items():
             flags[flag_name] = flag
@@ -498,13 +505,17 @@ class FlagConverter(metaclass=FlagsMeta):
 
     @classmethod
     def parse_flags(cls, argument: str) -> Dict[str, List[str]]:
+        # print(argument)
         result: Dict[str, List[str]] = {}
         flags = cls.__commands_flags__
         aliases = cls.__commands_flag_aliases__
+        prefix = cls.__commands_flag_prefix__
         last_position = 0
         last_flag: Optional[Flag] = None
 
         case_insensitive = cls.__commands_flag_case_insensitive__
+        flags_done = []
+        from pprint import pprint
         for match in cls.__commands_flag_regex__.finditer(argument):
             begin, end = match.span(0)
             key = match.group('flag')
@@ -513,8 +524,9 @@ class FlagConverter(metaclass=FlagsMeta):
 
             if key in aliases:
                 key = aliases[key]
-
             flag = flags.get(key)
+            pprint(flag.__dict__)
+            flags_done.append(flag)
             if last_position and last_flag is not None:
                 value = argument[last_position : begin - 1].lstrip()
                 if not value:
@@ -543,6 +555,11 @@ class FlagConverter(metaclass=FlagsMeta):
             else:
                 values.append(value)
 
+        if not cls.__commands_strict_bool__:
+            for name, flag in flags.items():
+                if not flag in flags_done and flag.annotation == bool:
+                    if re.match(rf'(({re.escape(prefix)})({re.escape(flag.name)}))', argument):
+                        result[flag.name] = ['True']
         # Verification of values will come at a later stage
         return result
 

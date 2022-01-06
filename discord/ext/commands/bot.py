@@ -34,13 +34,16 @@ import importlib.util
 import sys
 import traceback
 import types
+import logging
 from typing import Any, Callable, Mapping, List, Dict, TYPE_CHECKING, Optional, TypeVar, Type, Union
 
 import discord
-from discord.slash_options import SlashCommandOption
+from .slash_options import SlashCommandOption, InteractionDataOption
 from .slash_command import SlashCommand
 from .message_command import MessageCommand
 from .user_command import UserCommand
+from .slash_command_group import SlashCommandGroup
+from discord.enums import try_enum, SlashCommandOptionTypes
 
 from .core import GroupMixin
 from .view import StringView
@@ -141,6 +144,7 @@ class BotBase(GroupMixin):
         self.description = inspect.cleandoc(description) if description else ''
         self.owner_id = options.get('owner_id')
         self.owner_ids = options.get('owner_ids', set())
+        self.log_app_commands = options.get('log_app_commands', False)
         self.strip_after_prefix = options.get('strip_after_prefix', False)
         self.add_listener( self._deploy_application_commands, 'on_connect')
         self.add_listener( self._listen_application_commands, 'on_interaction')
@@ -176,86 +180,97 @@ class BotBase(GroupMixin):
                 if command_type == 1:    # type 1 being a slash command
                     try:
 
-                        command: SlashCommand = self.__get_slash_command(interaction)   # gets slash command based on the interaction
+                        command, group = self.__resolve_slash_command(interaction)   # gets slash command based on the interaction
                         interaction_options = interaction.data.get('options')           # get slash command options if any
 
-                        if interaction_options and command.options:                     # check if interaction response and command both have options
-                            
-                            opts = self.__parse_slash_options(command, interaction_options, interaction.guild)  # get command options as a list
-                            await command.callback(interaction, *opts)                  # run the command with list as arguments
+                        if group is None:
+                            if interaction_options and command.options:                     # check if interaction response and command both have options
+                                
+                                opts = self.__parse_slash_options(command, interaction_options, interaction.guild)  # get command options as a list
+                                await command.callback(interaction, *opts)                  # run the command with list as arguments
 
-                        else:                                                           # else just run the command without any other arguments
-                            await command.callback(interaction)  
-                    
+                            else:                                                           # else just run the command without any other arguments
+                                await command.callback(interaction)  
+                        else:
+                            if interaction_options and command.options:                     # check if interaction response and command both have options
+                                
+                                opts = self.__parse_slash_options(command, interaction_options, interaction.guild)  # get command options as a list
+                                await command.callback(group, interaction, *opts)                  # run the command with list as arguments
+
+                            else:                                                           # else just run the command without any other arguments
+                                await command.callback(group, interaction)  
+                        
+
                     except KeyError:
                         raise Exception('Command not found')
 
 
                 elif command_type == 2:     # if command type 2, being a user command
-                    command = self.__get_user_command(interaction)      # get command based on interaction
+                    command = self.__resolve_user_command(interaction)      # get command based on interaction
                     user = self.get_user(int(interaction.data['target_id']))     # get user
                     await command.callback(interaction, user)    # run command with user as argument
 
                 elif command_type == 3:     # if command type 3, being a message command
-                    command = self.__get_message_command(interaction)       # get command based on interaction
+                    command = self.__resolve_message_command(interaction)       # get command based on interaction
                     message = await interaction.channel.fetch_message(int(interaction.data['target_id']))       # get message 
                     await command.callback(interaction, message)     # run command with message as argument
 
-    def __get_slash_command(self, interaction:discord.Interaction) -> SlashCommand:
-        command = discord.utils.get( self.all_global_slash_commands.values(), id=int(interaction.data['id']) )
-        
-        if not command:
-            command = discord.utils.get(self.all_guild_slash_commands[int(interaction.guild_id)].values(), id=int(interaction.data['id']))
+    def __resolve_slash_command(self, interaction:discord.Interaction) -> SlashCommand:
+        group = None
+        command = None
+        id = int(interaction.data['id'])
+        res = discord.utils.get(self.all_global_application_commands.all_slash_commands, _id=id)
+        if not res: res = discord.utils.get(self.all_guild_application_commands[int(interaction.guild_id)].all_slash_commands, _id=id)
+        if isinstance(res, SlashCommandGroup):
+            group = res
+            command = discord.utils.get(res.commands.values(), name=interaction.data['options'][0]['name'])
+        elif isinstance(res, SlashCommand):
+            command = res
+            group = None
+            
 
-            # if not command: 
-            #     command = discord.utils.get(self.all_slash_command_groups[int(interaction.guild_id)].values(), id=int(interaction.data['id']))
-                
-            if not command: raise Exception("command not found")
+
+        if not command: raise Exception("command not found")
+        
+
+        return command, group
+
+    def __resolve_user_command(self, interaction:discord.Interaction) -> UserCommand:
+        command = None
+        id = int(interaction.data['id'])
+        command = discord.utils.get(self.all_global_application_commands.all_user_commands, _id=id)
+        if not command: command = discord.utils.get(self.all_guild_application_commands[int(interaction.guild_id)].all_user_commands, _id=id)
         
         return command
 
-    def __get_user_command(self, interaction:discord.Interaction) -> UserCommand:
-        command = discord.utils.get(self.all_user_commands.values(), id=int(interaction.data['id']))
-        if not command: raise Exception("command not found")
-        return command
-
-    def __get_message_command(self, interaction:discord.Interaction) -> MessageCommand:
-        command = discord.utils.get(self.all_message_commands.values(), id=int(interaction.data['id']))
-        if not command: raise Exception("command not found")
+    def __resolve_message_command(self, interaction:discord.Interaction) -> MessageCommand:
+        command = None
+        id = int(interaction.data['id'])
+        command = discord.utils.get(self.all_global_application_commands.all_message_commands, _id=id)
+        if not command: command = discord.utils.get(self.all_guild_application_commands[int(interaction.guild_id)].all_message_commands, _id=id)
+        
         return command
 
     def __parse_slash_options(self, command: SlashCommand, options:list, guild:discord.Guild):
-        final_opts = []
-        for i in command.options:
-            if not i.required:
-                option_value = next((x for x in options if x['name'] == i.name), None)
-                final_opts.append(option_value)
-            else:
-                try:
-                    option_value = next((x for x in options if x['name'] == i.name))
-                    final_opts.append(option_value)
-                except StopIteration:
-                    raise errors.UserInputError("Missing required argument")
-        
-        ## parse types
-        parsed_opts = []
 
-        option_types = SlashCommandOption.TYPES
-        for option in final_opts:
+
+        parsed_opts = []
+        option_types = SlashCommandOptionTypes
+        for option in options:
             type =  option['type']
             value = option['value']
             
-            if type == option_types.USER:
-                parsed_opts.append( self.get_user(int(value)) )
+            if type == option_types.user:
+                option['value'] = self.get_user(int(value))
                 
-            elif type == option_types.CHANNEL:
-                parsed_opts.append(guild.get_channel(int(value)))
+            elif type == option_types.channel:
+                option['value'] = guild.get_channel(int(value))
             
-            elif type == option_types.ROLE:
-                parsed_opts.append(guild.get_role(int(value)))
-            
-            else:
-                parsed_opts.append(value)
+            elif type == option_types.role:
+                option['value'] = guild.get_role(int(value))
+
+            option['type'] = try_enum(SlashCommandOptionTypes, type)
+            parsed_opts.append(InteractionDataOption(option))
             
         return parsed_opts 
 
@@ -266,132 +281,102 @@ class BotBase(GroupMixin):
         BASE_URL = Route.BASE
         header = {'Authorization' : 'Bot ' + self.http.token}
         
-        all_commands = []   # make list to store commands when looping through them
+        all_global_commands = []   # make list to store commands when looping through them
 
-        for command in self.all_global_slash_commands.values():   # looping through slash commands
-                json_ = {
-                    "type":1,
-                    "name": command.name,
-                    "description": command.description,
-                    "options": [i.json for i in command.options]
-                }
-
-
-                all_commands.append(json_)
-            
-
-        for command in self.all_user_commands.values():    # looping through user commands
-
-                json_ = {
-                    "type":2,
-                    "name":command.name
-                }
-
-                all_commands.append(json_)
-            
-        for command in self.all_message_commands.values():     # looping through message commands
-
-                json_ = {
-                    "type":3,
-                    "name":command.name
-                }
-                all_commands.append(json_)
+        for command in self.all_global_application_commands.all_commands:     # looping through message commands
+                all_global_commands.append(command.json)
         
-        for group in self.all_slash_command_groups.values():
-            json_ = {
-                    "type": 1,
-                    "name": group.name
-                }
+        for group in self.all_global_application_commands.all_slash_command_group:
+            if not group.is_guild:
+                all_global_commands.append(group.json)
             
-            if group.description: json_['description'] = group.description
-            json_['options'] = []
 
-            for command in group.commands:
-                command_json = {
-                    "type": 1,
-                    "name": command.name,
-                    "description":command.description,
-                    "options": [i.json for i in command.options]
-                }
-                json_['options'].append(command_json)
-                
+            
+        r = await self.http.bulk_upsert_global_commands(self.application_id, all_global_commands)
+        for command_data in r:
+            cmd_id   = int(command_data['id'])
+            cmd_type = int(command_data['type'])
+            cmd_name = str(command_data['name'])
 
-            all_commands.append(json_)
+            cmd_ = discord.utils.get(self.all_global_application_commands.all_slash_commands, name=cmd_name)
+            if(cmd_): cmd_._id = cmd_id
+
+
+
+        for guild_id, commands in self.all_guild_application_commands.items():   # looping through slash commands
+                r = await self.http.bulk_upsert_guild_commands(self.application_id, guild_id, [i.json for i in commands.all_commands])
+                for command_data in r:
+                    cmd_id   = int(command_data['id'])
+                    cmd_type = int(command_data['type'])
+                    cmd_name = str(command_data['name'])
+                    # print(command_data)
+
+                    print(f'checking command {cmd_name!r} in {guild_id!r} {cmd_id!r}') 
+
+                    guild_commands = self.all_guild_application_commands[guild_id]
+                    cmd = guild_commands.get_by_name(cmd_name)
+                    cmd._id = cmd_id
+
+
+
+
+
+
+    def add_slash_group(self, slash_cog: Type[SlashCommandGroup]):
+        cog = slash_cog(self)
+        name = (getattr(cog, 'name', None) or cog.__class__.__name__).lower()
+        if self.log_app_commands:
+            print('## slash command group - ' + cog.name + ' ##')
+            print(cog.commands)
+            print(cog.description)
+            print(cog.name)
+        
+        if cog.is_guild:
+            self.all_guild_application_commands[cog.guild_id].add_command(cog)
+        else:
+            self.all_global_application_commands.add_command(cog)
+
         
 
-            
 
-        async with aiohttp.ClientSession() as session:
-            async with session.put(BASE_URL + f'/applications/{self.application_id}/commands', headers=header, json=all_commands) as r:      # putting all the global commands
-                if r.status == 200:    
-                    data = await r.json()
-                    print(data)
-                    
-                    command_ids = { i['id'] : i  for i in data }     # getting all command ids from the response
-                    
-                    for _id, i in command_ids.items():
-                        _name = i['name']
-                        _type = i['type']
+    def _slash_load_from_module_spec(self, spec: importlib.machinery.ModuleSpec, key: str) -> None:
 
-                        if _type == 1:
-                            try:
-                                self.all_global_slash_commands[_name]._id = int(_id)
-                            except KeyError:
-                                self.all_slash_command_groups[_name]._id = int(_id)
+        lib = importlib.util.module_from_spec(spec)
+        sys.modules[key] = lib
+        try:
+            spec.loader.exec_module(lib)  # type: ignore
+        except Exception as e:
+            del sys.modules[key]
+            raise errors.ExtensionFailed(key, e) from e
 
-                        
-                        elif _type == 2:
-                            self.all_user_commands[_name]._id = int(_id)
-                        
-                        elif _type == 3:
-                            self.all_message_commands[_name]._id = int(_id)
+        try:
+            setup = getattr(lib, 'setup')
+        except AttributeError:
+            del sys.modules[key]
+            raise errors.NoEntryPointError(key)
 
-
-
-        for id, commands in self.all_guild_slash_commands.items():   # looping through slash commands
-                all_commands = []
-
-                for command in commands.values():
-                    json_ = {
-                        "type":1,
-                        "name": command.name,
-                        "description": command.description,
-                        "options": [i.json for i in command.options]
-                    }
-
-                    all_commands.append(json_)
+        try:
+            setup(self)
+        except Exception as e:
+            del sys.modules[key]
+            raise errors.ExtensionFailed(key, e) from e
+        else:
+            if lib.is_guild: self.all_guild_application_commands[lib.guild_id].add_command(lib)
+            else: self.all_global_application_commands.add_command(lib)
 
 
 
-                async with aiohttp.ClientSession() as session:
-                    async with session.put(BASE_URL + f'/applications/{self.application_id}/guilds/{id}/commands', headers=header, json=all_commands) as r:      # putting all the global commands
-                        if r.status == 200:    
-                            data = await r.json()
-                            print(data)
-                            
-                            command_ids = { i['id'] : i  for i in data }     # getting all command ids from the response
-                            
-                            for _id, i in command_ids.items():
-                                _name = i['name']
-                                _type = i['type']
+    def load_slash_group_module(self, name: str, *, package: Optional[str] = None) -> None:
+        name = self._resolve_name(name, package)
+        if name in [i.name for i in self.all_global_application_commands.all_slash_command_group]:
+            raise errors.ExtensionAlreadyLoaded(name)
+        spec = importlib.util.find_spec(name)
+        if spec is None:
+            raise errors.ExtensionNotFound(name)
 
-                                if _type == 1:
-                                    print(_name + " :(")
-                                    self.all_guild_slash_commands[id][_name]._id = int(_id)
-                                    
-                                    
-                                
-                                elif _type == 2:
-                                    self.all_user_commands[_name]._id = int(_id)
-                                
-                                elif _type == 3:
-                                    self.all_message_commands[_name]._id = int(_id)
-                            
-                        
-                            print(f"guild commands for {id}: status:{r.status}   ->    {[i['name'] for i in data]}")
-                        else:
-                            print(f"Error occured for guild commands {id}: status: {r.status}    ->    {await r.json()}")
-   
+        self._slash_load_from_module_spec(spec, name)
+
+
 
 
 

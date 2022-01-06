@@ -26,6 +26,7 @@ from __future__ import annotations
 import array
 import asyncio
 import collections.abc
+from enum import Enum
 from typing import (
     Any,
     AsyncIterator,
@@ -84,6 +85,7 @@ __all__ = (
     'escape_mentions',
     'as_chunks',
     'format_dt',
+    'escape_dict',
 )
 
 DISCORD_EPOCH = 1420070400000
@@ -141,6 +143,15 @@ else:
 T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True)
 _Iter = Union[Iterator[T], AsyncIterator[T]]
+
+def escape_dict(object: dict):
+    new_dict = {}
+    for key, value in object.items():
+        if not value in (None, [], ''):
+            new_dict[key] = value
+        if isinstance(value, Enum):
+            new_dict[key] = value.value
+    return new_dict
 
 
 class CachedSlotProperty(Generic[T, T_co]):

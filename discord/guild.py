@@ -46,6 +46,7 @@ from . import utils, abc
 from .role import Role
 from .member import Member, VoiceState
 from .emoji import Emoji
+from .schedule_events import ScheduledEvent
 from .errors import InvalidData
 from .permissions import PermissionOverwrite
 from .colour import Colour
@@ -55,6 +56,7 @@ from .channel import _guild_channel_factory
 from .channel import _threaded_guild_channel_factory
 from .enums import (
     AuditLogAction,
+    EventEntityType,
     VideoQualityMode,
     VoiceRegion,
     ChannelType,
@@ -225,6 +227,8 @@ class Guild(Hashable):
         The number goes from 0 to 3 inclusive.
     premium_subscription_count: :class:`int`
         The number of "boosts" this guild currently has.
+    premium_progress_bar_enabled: :class:`bool`
+        Whether the guild has the boost progress bar enabled
     preferred_locale: Optional[:class:`str`]
         The preferred locale for the guild. Used when filtering Server Discovery
         results to a specific language.
@@ -255,6 +259,7 @@ class Guild(Hashable):
         'max_video_channel_users',
         'premium_tier',
         'premium_subscription_count',
+        'premium_progress_bar_enabled',
         'preferred_locale',
         'nsfw_level',
         '_members',
@@ -274,6 +279,7 @@ class Guild(Hashable):
         '_public_updates_channel_id',
         '_stage_instances',
         '_threads',
+        '_scheduled_events',
     )
 
     _PREMIUM_GUILD_LIMITS: ClassVar[Dict[Optional[int], _GuildLimit]] = {
@@ -289,6 +295,7 @@ class Guild(Hashable):
         self._members: Dict[int, Member] = {}
         self._voice_states: Dict[int, VoiceState] = {}
         self._threads: Dict[int, Thread] = {}
+        self._scheduled_events: Dict[int, ScheduledEvent] = {}
         self._state: ConnectionState = state
         self._from_data(data)
 
@@ -297,6 +304,14 @@ class Guild(Hashable):
 
     def _remove_channel(self, channel: Snowflake, /) -> None:
         self._channels.pop(channel.id, None)
+
+
+    def _add_scheduled_event(self, event: ScheduledEvent, /) -> None:
+        self._scheduled_events[event.id] = event
+
+    def _remove_scheduled_event(self, event: Snowflake, /) -> None:
+        self._scheduled_events.pop(event.id, None)
+
 
     def _voice_state_for(self, user_id: int, /) -> Optional[VoiceState]:
         return self._voice_states.get(user_id)
@@ -435,6 +450,7 @@ class Guild(Hashable):
         self.max_video_channel_users: Optional[int] = guild.get('max_video_channel_users')
         self.premium_tier: int = guild.get('premium_tier', 0)
         self.premium_subscription_count: int = guild.get('premium_subscription_count') or 0
+        self.premium_progress_bar_enabled: bool = guild.get('premium_progress_bar_enabled')
         self._system_channel_flags: int = guild.get('system_channel_flags', 0)
         self.preferred_locale: Optional[str] = guild.get('preferred_locale')
         self._discovery_splash: Optional[str] = guild.get('discovery_splash')
@@ -453,6 +469,10 @@ class Guild(Hashable):
             member = Member(data=mdata, guild=self, state=state)
             if cache_joined or member.id == self_id:
                 self._add_member(member)
+
+        for e in guild.get('guild_scheduled_events', []):
+            scheduled_event = ScheduledEvent(guild=self, data=e, state=state)
+            self._scheduled_events[scheduled_event.id] = scheduled_event
 
         self._sync(guild)
         self._large: Optional[bool] = None if member_count is None else self._member_count >= 250
@@ -819,6 +839,32 @@ class Guild(Hashable):
         """
         return list(self._stage_instances.values())
 
+    @property
+    def scheduled_events(self) -> List[ScheduledEvent]:
+        """List[:class:`ScheduledEvent`]: Returns a :class:`list` of the guild's shceduled events.
+
+        .. versionadded:: 2.0
+        """
+        return list(self._scheduled_events.values())
+
+    def get_scheduled_events(self, scheduled_event_id: int, /) -> Optional[ScheduledEvent]:
+        """Returns a scheduled event with the given ID.
+
+        .. versionadded:: 2.0
+
+        Parameters
+        -----------
+        scheduled_event_id: :class:`int`
+            The ID to search for.
+
+        Returns
+        --------
+        Optional[:class:`ScheduledEvent`]
+            The scheduled event or ``None`` if not found.
+        """
+        return self._scheduled_events.get(scheduled_event_id)
+        
+
     def get_stage_instance(self, stage_instance_id: int, /) -> Optional[StageInstance]:
         """Returns a stage instance with the given ID.
 
@@ -987,6 +1033,51 @@ class Guild(Hashable):
         return self._state.http.create_channel(
             self.id, channel_type.value, name=name, parent_id=parent_id, permission_overwrites=perms, **options
         )
+
+    async def create_scheduled_event(
+        self,
+        name: str,
+        start_time: datetime.datetime,
+        target: Union[VoiceChannel, StageChannel, str],
+        *,
+        guild_only: bool = False,
+        description: str = None,
+        end_time: datetime.datetime = None,
+    ) -> Optional[ScheduledEvent]:
+
+        if isinstance(target, StageChannel):
+            entity_type = EventEntityType.stage.value
+            channel_id = target.id
+            location = None
+        elif isinstance(target, VoiceChannel):
+            entity_type = EventEntityType.voice.value
+            channel_id = target.id
+            location = None
+        elif isinstance(target, str):
+            entity_type = EventEntityType.external.value
+            channel_id = None
+            location = str(target)
+        else:
+            raise TypeError(f'target must be of type Union[channel.VoiceChannel, channel.StageChannel, str], got type `{target.__class__.__name__}`')
+
+        data = await self._state.http.create_scheduled_event(
+            self.id,
+            name,
+            start_time,
+            entity_type,
+
+            channel_id=channel_id,
+            location=location,
+            guild_only = guild_only,
+            description = description,
+            end_time = end_time,
+        )
+        event = ScheduledEvent(data=data, guild=self, state=self._state)
+        self._scheduled_events[event.id] = event
+        return event
+         
+
+
 
     async def create_text_channel(
         self,
@@ -1601,6 +1692,38 @@ class Guild(Hashable):
             return channel
 
         return [convert(d) for d in data]
+
+
+    async def fetch_scheduled_events(self) -> Sequence[ScheduledEvent]:
+        """|coro|
+
+        Retrieves all :class:`discord.ScheduledEvent` currently in the guild.
+
+        .. note::
+
+            This method is an API call.
+
+        Raises
+        -------
+        HTTPException
+            Retrieving the events failed.
+
+        Returns
+        -------
+        Sequence[:class:`discord.ScheduledEvent`]
+            All events currently in the guild.
+        """
+        data = await self._state.http.get_scheduled_events(self.id)
+
+        def convert(d):
+            event = ScheduledEvent(guild=self, state=self._state, data=d)
+            return event
+
+        return [convert(d) for d in data]
+
+
+
+
 
     async def active_threads(self) -> List[Thread]:
         """|coro|

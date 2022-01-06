@@ -30,6 +30,7 @@ __all__ = (
     'Enum',
     'ChannelType',
     'MessageType',
+    'EventStatusType',
     'VoiceRegion',
     'SpeakingState',
     'VerificationLevel',
@@ -213,6 +214,28 @@ class MessageType(Enum):
     thread_starter_message = 21
     guild_invite_reminder = 22
 
+
+class SlashCommandOptionTypes(Enum):
+    string = 3
+    integer = 4
+    boolean = 5
+    user = 6
+    channel = 7
+    role = 8
+    mentionable = 9
+    float = 10
+
+
+class EventStatusType(Enum):
+    scheduled = 1
+    active = 2
+    completed = 3
+    cancelled = 4
+
+class EventEntityType(Enum):
+    stage = 1
+    voice = 2
+    external = 3
 
 class VoiceRegion(Enum):
     us_west = 'us-west'

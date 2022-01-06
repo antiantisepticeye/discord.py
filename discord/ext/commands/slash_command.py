@@ -21,7 +21,8 @@ from typing import (
 
 
 from discord.interactions import Interaction
-from discord.slash_options import SlashCommandOption
+from discord.utils import escape_dict
+from .slash_options import SlashCommandOption
 
 
 from .errors import *
@@ -51,8 +52,7 @@ from ._types import _BaseSlashCommand
 
 __all__ = (
     'SlashCommand',
-    'SlashCommandOption',
-    'SlashCommandGroup'
+    'SlashCommandOption'
 )
 
 
@@ -132,6 +132,7 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
         self.brief: Optional[str] = kwargs.get('brief')
         self.usage: Optional[str] = kwargs.get('usage')
         self.extras: Dict[str, Any] = kwargs.get('extras', {})
+        self.is_sub_command: bool = kwargs.get('is_sub', False)
         
         description = kwargs.get('description') or self.name
 
@@ -167,9 +168,13 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
     @property
     def options(self):
         return self._options
-
-
-class SlashCommandGroup: 
-    def __init__(self) -> None:
-        pass
-
+    
+    @property
+    def json(self):
+        json_ = {
+            "type":1,
+            "name": self.name,
+            "description": self.description,
+            "options": [i.json for i in self.options]
+        }
+        return escape_dict(json_)

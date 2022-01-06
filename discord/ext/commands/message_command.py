@@ -12,6 +12,8 @@ from typing import (
     Type,
     TypeVar
 )
+
+from discord.utils import escape_dict
 __all__ = (
     'MessageCommand'
 )
@@ -140,6 +142,13 @@ class MessageCommand(_BaseMessageCommand, Generic[P, T]):
     def options(self):
         return self._options
 
+    @property 
+    def json(self):
+        json_ = {
+            "type":3,
+            "name":self.name
+        }
+        return escape_dict(json_)
 
 
 

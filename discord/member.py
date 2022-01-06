@@ -260,6 +260,7 @@ class Member(discord.abc.Messageable, _UserTag):
         'activities',
         'guild',
         'pending',
+        'timeout_until',
         'nick',
         '_client_status',
         '_user',
@@ -283,6 +284,7 @@ class Member(discord.abc.Messageable, _UserTag):
         banner: Optional[Asset]
         accent_color: Optional[Colour]
         accent_colour: Optional[Colour]
+        communication_disabled_until: Optional[datetime.datetime]
 
     def __init__(self, *, data: MemberWithUserPayload, guild: Guild, state: ConnectionState):
         self._state: ConnectionState = state
@@ -296,6 +298,7 @@ class Member(discord.abc.Messageable, _UserTag):
         self.nick: Optional[str] = data.get('nick', None)
         self.pending: bool = data.get('pending', False)
         self._avatar: Optional[str] = data.get('avatar')
+        self.timeout_until: Optional[datetime.datetime] = utils.parse_time(data.get('communication_disabled_until'))
 
     def __str__(self) -> str:
         return str(self._user)
@@ -353,6 +356,7 @@ class Member(discord.abc.Messageable, _UserTag):
         self.activities = member.activities
         self._state = member._state
         self._avatar = member._avatar
+        self.timeout_until = member.timeout_until
 
         # Reference will not be copied unless necessary by PRESENCE_UPDATE
         # See below
@@ -372,10 +376,11 @@ class Member(discord.abc.Messageable, _UserTag):
             pass
 
         try:
-            self.pending = data['pending']
+            self.pending = data['pending']          
         except KeyError:
             pass
 
+        self.timeout_until = utils.parse_time(data.get('communication_disabled_until'))     
         self.premium_since = utils.parse_time(data.get('premium_since'))
         self._roles = utils.SnowflakeList(map(int, data['roles']))
         self._avatar = data.get('avatar')
@@ -419,6 +424,7 @@ class Member(discord.abc.Messageable, _UserTag):
     def status(self, value: Status) -> None:
         # internal use only
         self._client_status[None] = str(value)
+
 
     @property
     def mobile_status(self) -> Status:
@@ -607,6 +613,26 @@ class Member(discord.abc.Messageable, _UserTag):
     def voice(self) -> Optional[VoiceState]:
         """Optional[:class:`VoiceState`]: Returns the member's current voice state."""
         return self.guild._voice_state_for(self._user.id)
+
+
+    async def timeout(
+        self,
+        time: int = 5,
+        *,
+        reason: Optional[str] = None
+    ) -> None:
+        """|coro|
+
+        Timeouts this member.
+
+        Parameters
+        -----------
+        time: :class:`int`
+            Amount of time to timeout the member for (in milliseconds).
+
+        """
+        await self._state.http.timeout(self.guild.id, self.id, datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp() + time), reason=reason)
+
 
     async def ban(
         self,
