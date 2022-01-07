@@ -251,7 +251,7 @@ class Asset(AssetMixin):
         format = 'gif' if animated else 'png'
         return cls(
             state,
-            url=f'{cls.BASE}/emojis/{emoji_id}.{format}?size=512',
+            url=f'{cls.BASE}/emojis/{emoji_id}.{format}',
             key=emoji_id,
             animated=animated
         )
