@@ -1567,7 +1567,7 @@ class GroupMixin(Generic[CogT]):
             command.parent = self
 
 
-        if guild:
+        if guild != None:
             if self.all_guild_application_commands.get(guild):
                 self.all_guild_application_commands[guild].add_command(command)
             else:

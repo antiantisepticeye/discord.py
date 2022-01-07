@@ -238,16 +238,28 @@ class BotBase(GroupMixin):
     def __resolve_user_command(self, interaction:discord.Interaction) -> UserCommand:
         command = None
         id = int(interaction.data['id'])
-        command = discord.utils.get(self.all_global_application_commands.all_user_commands, _id=id)
-        if not command: command = discord.utils.get(self.all_guild_application_commands[int(interaction.guild_id)].all_user_commands, _id=id)
+        name = str(interaction.data['name'])
+        command = discord.utils.get(self.all_global_application_commands.all_user_commands, id=id) or discord.utils.get(self.all_global_application_commands.all_user_commands, name=name)
+        if command is None: 
+            guild_commands = self.all_guild_application_commands.get(int(interaction.guild_id))
+            if guild_commands:
+                command = discord.utils.get(guild_commands.all_user_commands, id=id) or discord.utils.get(guild_commands.all_user_commands, name=name)
+        
+        if command is None: raise Exception("command not found")
         
         return command
 
     def __resolve_message_command(self, interaction:discord.Interaction) -> MessageCommand:
         command = None
         id = int(interaction.data['id'])
-        command = discord.utils.get(self.all_global_application_commands.all_message_commands, _id=id)
-        if not command: command = discord.utils.get(self.all_guild_application_commands[int(interaction.guild_id)].all_message_commands, _id=id)
+        name = str(interaction.data['name'])
+        command = discord.utils.get(self.all_global_application_commands.all_message_commands, id=id) or discord.utils.get(self.all_global_application_commands.all_message_commands, name=name)
+        if command is None: 
+            guild_commands = self.all_guild_application_commands.get(int(interaction.guild_id))
+            if guild_commands:
+                command = discord.utils.get(guild_commands.all_message_commands, id=id) or discord.utils.get(guild_commands.all_message_commands, name=name)
+        
+        if command is None: raise Exception("command not found")
         
         return command
 
