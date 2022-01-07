@@ -246,6 +246,16 @@ class Asset(AssetMixin):
             animated=animated
         )
 
+    @classmethod
+    def _from_custom_emoji(cls, state, emoji_id: int, animated=True) -> Asset:
+        format = 'gif' if animated else 'png'
+        return cls(
+            state,
+            url=f'{cls.BASE}/emojis/{emoji_id}.{format}?size=512',
+            key=emoji_id,
+            animated=animated
+        )
+
     def __str__(self) -> str:
         return self._url
 
