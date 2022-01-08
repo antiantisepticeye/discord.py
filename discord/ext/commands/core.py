@@ -1424,7 +1424,7 @@ class GroupMixin(Generic[CogT]):
         """
         def decorator(func: Callable[Concatenate[InteractionT, P], Coro[Any]]) -> SlashCommandT:
             kwargs.setdefault('parent', self)
-            guild=kwargs.get('guild')
+            guild=kwargs.get('guild', MISSING)
             result = slash_command(name=name, description=description, cls=cls, *args, **kwargs)(func)
             self.add_slash_command(result, guild=guild)
 
@@ -1476,7 +1476,6 @@ class GroupMixin(Generic[CogT]):
             else:
                 self.all_guild_application_commands[guild] = ApplicationCommandsDict()
                 self.all_guild_application_commands[guild].add_command(command)
-        print(self.all_guild_application_commands[guild])
 
 
     def get_global_slash_command(self, name: str) -> Optional[SlashCommand]:
