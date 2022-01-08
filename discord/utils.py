@@ -62,7 +62,10 @@ import sys
 import types
 import warnings
 
-from .errors import InvalidArgument
+import aiohttp
+
+
+from .errors import InvalidArgument, HTTPException, Forbidden, DiscordServerError, NotFound
 
 try:
     import orjson
@@ -86,6 +89,7 @@ __all__ = (
     'as_chunks',
     'format_dt',
     'escape_dict',
+    'UserBot',
 )
 
 DISCORD_EPOCH = 1420070400000
@@ -1028,3 +1032,52 @@ def format_dt(dt: datetime.datetime, /, style: Optional[TimestampStyle] = None) 
     if style is None:
         return f'<t:{int(dt.timestamp())}>'
     return f'<t:{int(dt.timestamp())}:{style}>'
+
+
+async def json_or_text(response: aiohttp.ClientResponse) -> Union[Dict[str, Any], str]:
+    text = await response.text(encoding='utf-8')
+    try:
+        if response.headers['content-type'] == 'application/json':
+            return _from_json(text)
+    except KeyError:
+        # Thanks Cloudflare
+        pass
+
+    return text
+
+
+class UserBot:
+    """A UserBot object created with a user token to access some specific public api endpoints only users have access to.
+    
+    **Please do not use it in most cases as it might goes against discord Terms of Service**
+
+    """
+    def __init__(self, token:str) -> None:
+        self.token: str = token
+    
+    async def get_url(self, url:str) -> Union[dict,str]:
+        """returns a guild payload if available, or returns None"""
+        headers = {
+            "authorization": self.token
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                data = await json_or_text(response)
+                
+                if 300 > response.status >= 200:
+                    return data
+
+                # the usual error cases
+                if response.status == 403:
+                    raise Forbidden(response, data)
+                elif response.status == 404:
+                    raise NotFound(response, data)
+                elif response.status >= 500:
+                    raise DiscordServerError(response, data)
+                else:
+                    raise HTTPException(response, data)
+                
+    async def get_emoji_guild(self, emoji_id:int) -> Optional[dict]:
+        return await self.get_url(f'https://discord.com/api/v9/emojis/{emoji_id}/guild')
+
+

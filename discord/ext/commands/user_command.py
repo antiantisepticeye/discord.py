@@ -101,7 +101,7 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         name = kwargs.get('name') or func.__name__
         if not isinstance(name, str):
             raise TypeError('Name of a command must be a string.')
-        self.name: str = name.lower()
+        self.name: str = name
 
         self.callback = func
 
