@@ -56,12 +56,12 @@ from .cog import Cog
 from .context import Context
 
 from discord.interactions import Interaction
-from .slash_options import SlashCommandOption
+from .application_commands.slash_options import SlashCommandOption
 from ._types import _BaseCommand
-from .slash_command import SlashCommand
-from .message_command import MessageCommand
-from .user_command import UserCommand
-from .slash_command_group import SlashCommandGroup
+from .application_commands.slash_command import SlashCommand
+from .application_commands.message_command import MessageCommand
+from .application_commands.user_command import UserCommand
+from .application_commands.slash_command_group import SlashCommandGroup
 
 if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec, TypeGuard

@@ -9,6 +9,7 @@ from typing import (
     TypeVar,
     Callable,
     ClassVar,
+    Union,
     overload,
     Dict,
     List
@@ -69,10 +70,17 @@ class GroupMeta(type):
         attrs['__group_name__'] = kwargs.pop('name', name)
         attrs['__group_description__'] = kwargs.pop('description', description)
         attrs['guild_id'] = kwargs.pop('guild_id', None)
+        initial_commands: List[Union[SlashCommand, SlashSubGroup]] = kwargs.pop('commands', [])
 
         
         commands = {}
         groups = {}
+
+        for i in initial_commands:
+            if isinstance(i, SlashCommand):
+                commands[i.name] = i
+            elif isinstance(i, SlashSubGroup):
+                groups[i.name] = i
 
         new_cls = super().__new__(cls, name, description, attrs, **kwargs)
         for base in reversed(new_cls.__mro__):

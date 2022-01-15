@@ -38,14 +38,14 @@ import logging
 from typing import Any, Callable, Mapping, List, Dict, TYPE_CHECKING, Optional, Tuple, TypeVar, Type, Union
 
 import discord
-from .slash_options import SlashCommandOption, InteractionDataOption
-from .slash_command import SlashCommand
-from .message_command import MessageCommand
-from .user_command import UserCommand
-from .slash_command_group import SlashCommandGroup, SlashSubGroup
+from .application_commands.slash_options import SlashCommandOption, InteractionDataOption
+from .application_commands.slash_command import SlashCommand
+from .application_commands.message_command import MessageCommand
+from .application_commands.user_command import UserCommand
+from .application_commands.slash_command_group import SlashCommandGroup, SlashSubGroup
 from discord.enums import try_enum, SlashCommandOptionTypes
 
-from .core import GroupMixin
+from .core import GroupMixin, ApplicationCommandsDict
 from .view import StringView
 from .context import Context
 from . import errors
@@ -368,6 +368,7 @@ class BotBase(GroupMixin):
     def add_slash_group(self, slash_cog: Type[SlashCommandGroup]):
         cog = slash_cog
         if cog.is_guild:
+            if not self.all_guild_application_commands.get(cog.guild_id): self.all_guild_application_commands[cog.guild_id] = ApplicationCommandsDict()
             self.all_guild_application_commands[cog.guild_id].add_command(cog)
         else:
             self.all_global_application_commands.add_command(cog)
@@ -396,10 +397,6 @@ class BotBase(GroupMixin):
         except Exception as e:
             del sys.modules[key]
             raise errors.ExtensionFailed(key, e) from e
-        else:
-            if lib.is_guild: self.all_guild_application_commands[lib.guild_id].add_command(lib)
-            else: self.all_global_application_commands.add_command(lib)
-
 
 
     def load_slash_group_module(self, name: str, *, package: Optional[str] = None) -> None:

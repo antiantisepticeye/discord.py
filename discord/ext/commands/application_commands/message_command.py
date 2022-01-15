@@ -13,46 +13,47 @@ from typing import (
     TypeVar
 )
 
-from discord.utils import escape_dict
+from discord.utils import escape_dict, escape_list
 __all__ = (
-    'UserCommand'
+    'MessageCommand'
 )
 
 from discord.interactions import Interaction
 
-from .errors import *
+from ..errors import *
 
 if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec, TypeGuard
 
     from discord.message import Message
 
-    from ._types import (
+    from .._types import (
         Coro,
         CoroFunc,
         Check,
         Hook,
         Error,
     )
-    from .core import _CaseInsensitiveDict
+    from ..core import _CaseInsensitiveDict
 
 if TYPE_CHECKING:
     P = ParamSpec('P')
 else:
     P = TypeVar('P')
 
-from ._types import _BaseUserCommand
+
+from .._types import _BaseMessageCommand
 
 
 
 T = TypeVar('T')
-UserCommandT = TypeVar('UserCommandT', bound='UserCommand')
+MessageCommandT = TypeVar('MessageCommandT', bound='MessageCommand')
 InteractionT = TypeVar('InteractionT', bound='Interaction')
 
 
-class UserCommand(_BaseUserCommand, Generic[P, T]):
+class MessageCommand(_BaseMessageCommand, Generic[P, T]):
 
-    r"""A class that implements the protocol for a bot user command.
+    r"""A class that implements the protocol for a bot message command.
 
     These are not created manually, instead they are created via the
     decorator or functional interface.
@@ -61,23 +62,24 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     -----------
     name: :class:`str`
         The name of the command.
-    description: :class:`str`
-        An optional description.
-        This will not show with the command in the context menu.
     callback: :ref:`coroutine <coroutine>`
-        The coroutine that is executed when the user command is called.
+        The coroutine that is executed when the message command is called.
     help: Optional[:class:`str`]
         The long help text for the command.
     brief: Optional[:class:`str`]
         The short help text for the command.
     usage: Optional[:class:`str`]
         A replacement for arguments in the default help text.
+    description: :class:`str`
+        An optional description.
+        This will not show with the command in the context menu.
     allowed_users: Optional[Dict[:class:`int`, :class:`bool`]]
         A mapping of user ids to a boolean value for wether they should be allowed to use the command or not 
     allowed_roles: Optional[Dict[:class:`int`, :class:`bool`]]
         A mapping of role ids to a boolean value for wether users with those roles should be allowed to use the command or not 
     extras: :class:`dict`
-        A dict of user provided extras to attach to the UserCommand. 
+        A dict of user provided extras to attach to the MessageCommand. 
+        
         
         .. note::
             This object may be copied by the library.
@@ -87,7 +89,7 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     """
     __original_kwargs__: Dict[str, Any]
 
-    def __new__(cls: Type[UserCommandT], *args: Any, **kwargs: Any) -> UserCommandT:
+    def __new__(cls: Type[MessageCommandT], *args: Any, **kwargs: Any) -> MessageCommandT:
         self = super().__new__(cls)
         self.__original_kwargs__ = kwargs.copy()
         return self
@@ -105,7 +107,7 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         if not isinstance(name, str):
             raise TypeError('Name of a command must be a string.')
         self.name: str = name
-
+        
         self.callback = func
 
         help_doc = kwargs.get('help')
@@ -123,7 +125,6 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         self.extras: Dict[str, Any] = kwargs.get('extras', {})
         self.allowed_users: Dict[int, bool] = kwargs.get('allowed_users', {})
         self.allowed_roles: Dict[int, bool] = kwargs.get('allowed_roles', {})
-        
         description = kwargs.get('description') or self.name
 
 
@@ -146,11 +147,10 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     def options(self):
         return self._options
 
-
     @property 
     def json(self):
         json_ = {
-            "type":2,
+            "type":3,
             "name":self.name
         }
         return escape_dict(json_)
@@ -184,3 +184,15 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
 
 
 
+
+
+    # def __init__(self, attrs:dict, func: Callable):
+    #     name = attrs['name']
+    #     if not isinstance(name, str): raise TypeError('Name must be of type string')
+    #     self.name: str = name
+
+    #     if not isinstance(func, Callable):   raise TypeError('Function of a command must be a Coroutine.')
+    #     self.func: Callable = func
+
+    #     self.id =  ""
+       
