@@ -93,7 +93,7 @@ class GuildApplicationCommandPermissions(PartialGuildApplicationCommandPermissio
     guild_id: Snowflake
 
 
-InteractionType = Literal[1, 2, 3]
+InteractionType = Literal[1, 2, 3, 4]
 
 
 class _ApplicationCommandInteractionDataOption(TypedDict):

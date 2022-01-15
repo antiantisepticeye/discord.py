@@ -21,7 +21,7 @@ from typing import (
 
 
 from discord.interactions import Interaction
-from discord.utils import escape_dict
+from discord.utils import escape_dict, escape_list
 from .slash_options import SlashCommandOption
 
 
@@ -71,25 +71,29 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
     These are not created manually, instead they are created via the
     decorator or functional interface.
 
-    Attributes
+    Key word arguments
     -----------
     name: :class:`str`
         The name of the command.
+    description: :class:`str`
+        The description to appear with the slash command.
+        The message prefixed into the default help command.
     callback: :ref:`coroutine <coroutine>`
         The coroutine that is executed when the slash command is called.
+
     help: Optional[:class:`str`]
         The long help text for the command.
     brief: Optional[:class:`str`]
         The short help text for the command.
     usage: Optional[:class:`str`]
         A replacement for arguments in the default help text.
-    description: :class:`str`
-        The description to appear with the slash command.
-        The message prefixed into the default help command.
+    allowed_users: Optional[Dict[:class:`int`, :class:`bool`]]
+        A mapping of user ids to a boolean value for wether they should be allowed to use the command or not 
+    allowed_roles: Optional[Dict[:class:`int`, :class:`bool`]]
+        A mapping of role ids to a boolean value for wether users with those roles should be allowed to use the command or not 
     extras: :class:`dict`
         A dict of user provided extras to attach to the SlashCommand. 
-        
-        
+
         .. note::
             This object may be copied by the library.
 
@@ -132,7 +136,11 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
         self.brief: Optional[str] = kwargs.get('brief')
         self.usage: Optional[str] = kwargs.get('usage')
         self.extras: Dict[str, Any] = kwargs.get('extras', {})
-        self.is_sub_command: bool = kwargs.get('is_sub', False)
+        self.allowed_users: Dict[int, bool] = kwargs.get('allowed_users', {})
+        self.allowed_roles: Dict[int, bool] = kwargs.get('allowed_roles', {})
+        self._is_sub_command: bool = kwargs.get('is_sub', False)
+        self._is_sub_sub_command: bool = kwargs.get('is_sub_sub', False)
+        self.autocomplete_callback = None
         
         description = kwargs.get('description') or self.name
 
@@ -156,10 +164,13 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
                 raise TypeError('Options must be a list of discord.SlashCommandOptions')
             
             self._options = options
-
         self._id: int = 0
         
 
+    def on_autocomplete(self) -> Callable:
+        def inner(func: Callable) -> SlashCommand:
+            self.autocomplete_callback = func
+        return inner
 
     @property
     def id(self):
@@ -178,3 +189,30 @@ class SlashCommand(_BaseSlashCommand, Generic[P, T]):
             "options": [i.json for i in self.options]
         }
         return escape_dict(json_)
+
+    @property
+    def permissions_json(self):
+        json_ = []
+        
+        for id_, allow_ in self.allowed_users.items():
+            json_.append(
+                {
+                    "id": int(id_),
+                    "type": 2,
+                    "permission": int(allow_),
+                }
+            ) 
+        
+        for id_, allow_ in self.allowed_roles.items():
+            json_.append(
+                {
+                    "id": int(id_),
+                    "type": 1,
+                    "permission": int(allow_),
+                }
+            ) 
+        
+        
+
+        if len(json_): return escape_list(json_)
+        else: return None 

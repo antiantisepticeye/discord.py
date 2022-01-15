@@ -110,6 +110,7 @@ class Interaction:
         'user',
         'token',
         'version',
+        'raw_payload',
         '_permissions',
         '_state',
         '_session',
@@ -134,6 +135,7 @@ class Interaction:
         self.channel_id: Optional[int] = utils._get_as_snowflake(data, 'channel_id')
         self.guild_id: Optional[int] = utils._get_as_snowflake(data, 'guild_id')
         self.application_id: int = int(data['application_id'])
+        self.raw_payload: InteractionPayload = data
 
         self.message: Optional[Message]
         try:
@@ -358,6 +360,10 @@ class Interaction:
             self.token,
             session=self._session,
         )
+
+    async def respond_autcomplete(self, autocomplete_result:list) -> None:
+        await self._state.http.post_automplete_callback(self.id, self.token, autocomplete_result)
+
 
 
 class InteractionResponse:

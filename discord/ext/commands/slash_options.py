@@ -29,7 +29,7 @@ class InteractionDataOption:
 class SlashCommandOption:
     Types = SlashCommandOptionTypes
 
-    def __init__(self, name: str, description: str, type_: SlashCommandOptionTypes=3, required:bool=True, choices:List[Choices]=None, **attrs):
+    def __init__(self, name: str, description: str, type_: SlashCommandOptionTypes=3, required:bool=True, choices:List[Choices]=[], min_value: Union[int, float]=None, max_value: Union[int, float]=None, channel_types: List[discord.enums.ChannelType]=[], autocomplete=False):
 
         if not isinstance(name, str): 
             raise TypeError('Name of option must be of type string')
@@ -39,16 +39,17 @@ class SlashCommandOption:
             raise TypeError('Type of option must be of int or a SlashCommandOptionTypes')
         if not isinstance(required, bool): 
             raise TypeError('attribute `required` must be of type bool')
-        if choices and not isinstance(choices, list): 
-            raise TypeError('choices must be a list of dicts( name: str, value: str | int | float )')
-        
+
 
         self.name = name 
         self.description = description
         self.type =  type_ if isinstance(type_, int) else type_.value
         self.required = required
         self.choices = choices
-        self.attrs = attrs
+        self.min_value = min_value
+        self.max_value = max_value
+        self.channel_types = channel_types
+        self.autocomplete = autocomplete
 
     @property
     def json(self):
@@ -57,9 +58,14 @@ class SlashCommandOption:
             "description": self.description,
             "type":self.type,
             "required":self.required,
-            "choices": self.choices
+            "choices": self.choices,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "channel_types": self.channel_types,
+            "autocomplete": self.autocomplete,
         }
-        json_ = dict(json_, **self.attrs)
-        return escape_dict(json_)
+        json_ = escape_dict(json_)
+        print(json_)
+        return json_
         
 

@@ -89,6 +89,7 @@ __all__ = (
     'as_chunks',
     'format_dt',
     'escape_dict',
+    'escape_list',
     'UserBot',
 )
 
@@ -148,13 +149,39 @@ T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True)
 _Iter = Union[Iterator[T], AsyncIterator[T]]
 
+def escape_list(object: list):
+    new_list = []
+    for value in object:
+
+        if not value in (None, [], ''):
+        
+            if isinstance((value), Enum) or value.__class__.__name__.startswith('_EnumValue_'):
+                new_list.append(value.value)
+            elif isinstance(value, dict):
+                new_list.append(escape_dict(value))
+            elif isinstance(value, list):
+                new_list.append(escape_list(value))
+            else:
+                new_list.append(value)
+    
+    return new_list
+
 def escape_dict(object: dict):
     new_dict = {}
     for key, value in object.items():
+    
         if not value in (None, [], ''):
-            new_dict[key] = value
-        if isinstance(value, Enum):
-            new_dict[key] = value.value
+            
+            if isinstance((value), Enum) or value.__class__.__name__.startswith('_EnumValue_'):
+                new_dict[key] = value.value
+            elif isinstance(value, dict):
+                new_dict[key] = escape_dict(value)
+            elif isinstance(value, list):
+                new_dict[key] = escape_list(value)
+                # print("\n\na list!", value, "\n\n")
+            else:
+                new_dict[key] = value
+                
     return new_dict
 
 

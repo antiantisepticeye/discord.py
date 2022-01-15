@@ -61,6 +61,9 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     -----------
     name: :class:`str`
         The name of the command.
+    description: :class:`str`
+        An optional description.
+        This will not show with the command in the context menu.
     callback: :ref:`coroutine <coroutine>`
         The coroutine that is executed when the user command is called.
     help: Optional[:class:`str`]
@@ -69,12 +72,12 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         The short help text for the command.
     usage: Optional[:class:`str`]
         A replacement for arguments in the default help text.
-    description: :class:`str`
-        An optional description.
-        This will not show with the command in the context menu.
+    allowed_users: Optional[Dict[:class:`int`, :class:`bool`]]
+        A mapping of user ids to a boolean value for wether they should be allowed to use the command or not 
+    allowed_roles: Optional[Dict[:class:`int`, :class:`bool`]]
+        A mapping of role ids to a boolean value for wether users with those roles should be allowed to use the command or not 
     extras: :class:`dict`
         A dict of user provided extras to attach to the UserCommand. 
-        
         
         .. note::
             This object may be copied by the library.
@@ -118,6 +121,8 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         self.brief: Optional[str] = kwargs.get('brief')
         self.usage: Optional[str] = kwargs.get('usage')
         self.extras: Dict[str, Any] = kwargs.get('extras', {})
+        self.allowed_users: Dict[int, bool] = kwargs.get('allowed_users', {})
+        self.allowed_roles: Dict[int, bool] = kwargs.get('allowed_roles', {})
         
         description = kwargs.get('description') or self.name
 
@@ -149,5 +154,33 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
             "name":self.name
         }
         return escape_dict(json_)
+
+    @property
+    def permissions_json(self):
+        json_ = []
+        
+        for id_, allow_ in self.allowed_users.items():
+            json_.append(
+                {
+                    "id": int(id_),
+                    "type": 2,
+                    "permission": int(allow_),
+                }
+            ) 
+        
+        for id_, allow_ in self.allowed_roles.items():
+            json_.append(
+                {
+                    "id": int(id_),
+                    "type": 1,
+                    "permission": int(allow_),
+                }
+            ) 
+        
+        
+
+        if len(json_): return escape_list(json_)
+        else: return None 
+
 
 

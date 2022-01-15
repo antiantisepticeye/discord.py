@@ -62,7 +62,7 @@ __all__ = (
 def _create_value_cls(name, comparable):
     cls = namedtuple('_EnumValue_' + name, 'name value')
     cls.__repr__ = lambda self: f'<{name}.{self.name}: {self.value!r}>'
-    cls.__str__ = lambda self: f'{name}.{self.name}'
+    cls.__str__ = lambda self: f'{name}.{self.name}'    
     if comparable:
         cls.__le__ = lambda self, other: isinstance(other, self.__class__) and self.value <= other.value
         cls.__ge__ = lambda self, other: isinstance(other, self.__class__) and self.value >= other.value
@@ -187,7 +187,10 @@ class ChannelType(Enum):
 
     def __str__(self):
         return self.name
+    
+    
 
+print(ChannelType.text.__class__.__name__)
 
 class MessageType(Enum):
     default = 0
@@ -551,6 +554,7 @@ class InteractionType(Enum):
     ping = 1
     application_command = 2
     component = 3
+    autocomplete = 4
 
 
 class InteractionResponseType(Enum):

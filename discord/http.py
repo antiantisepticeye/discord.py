@@ -1622,6 +1622,16 @@ class HTTPClient:
         r = Route('POST', '/guilds/{guild_id}/scheduled-events', guild_id=guild_id)
         return self.request(r, json=params)
 
+
+    def post_automplete_callback(self, interaction_id: Snowflake, interaction_token:str, autocomplete_result:list) -> Response:
+        r = Route('POST', '/interactions/{interaction_id}/{interaction_token}/callback', interaction_id=interaction_id, interaction_token=interaction_token)
+        return self.request(r, json={
+            "type":8,
+            "data": {
+                "choices":autocomplete_result
+            }
+        })
+
     # Application commands (global)
 
     def get_global_commands(self, application_id: Snowflake) -> Response[List[interactions.ApplicationCommand]]:
