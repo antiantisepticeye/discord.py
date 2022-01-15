@@ -20,21 +20,21 @@ __all__ = (
 
 from discord.interactions import Interaction
 
-from ..errors import *
+from .errors import *
 
 if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec, TypeGuard
 
     from discord.message import Message
 
-    from .._types import (
+    from ._types import (
         Coro,
         CoroFunc,
         Check,
         Hook,
         Error,
     )
-    from ..core import _CaseInsensitiveDict
+    from .core import _CaseInsensitiveDict
 
 if TYPE_CHECKING:
     P = ParamSpec('P')
@@ -42,7 +42,7 @@ else:
     P = TypeVar('P')
 
 
-from .._types import _BaseMessageCommand
+from ._types import _BaseMessageCommand
 
 
 

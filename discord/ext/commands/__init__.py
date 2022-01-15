@@ -17,4 +17,8 @@ from .converter import *
 from .cooldowns import *
 from .cog import *
 from .flags import *
-from .application_commands import *
+from .message_command import MessageCommand
+from .slash_command import SlashCommand
+from .slash_command_group import SlashCommandGroup, SlashSubGroup
+from .user_command import UserCommand
+from .slash_options import SlashCommandOption, InteractionDataOption

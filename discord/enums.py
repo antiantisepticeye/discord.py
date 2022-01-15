@@ -55,6 +55,7 @@ __all__ = (
     'StagePrivacyLevel',
     'InteractionType',
     'InteractionResponseType',
+    'SlashCommandOptionTypes',
     'NSFWLevel',
 )
 

@@ -38,8 +38,13 @@ import logging
 from typing import Any, Callable, Mapping, List, Dict, TYPE_CHECKING, Optional, Tuple, TypeVar, Type, Union
 
 import discord
-from .application_commands import SlashCommandOption, SlashCommand, MessageCommand, UserCommand, SlashCommandGroup, InteractionDataOption, SlashSubGroup
+from .message_command import MessageCommand
+from .slash_command import SlashCommand
+from .slash_command_group import SlashCommandGroup, SlashSubGroup
+from .user_command import UserCommand
+from .slash_options import SlashCommandOption, InteractionDataOption
 from discord.enums import try_enum, SlashCommandOptionTypes
+
 
 from .core import GroupMixin, ApplicationCommandsDict
 from .view import StringView

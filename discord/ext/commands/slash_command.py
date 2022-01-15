@@ -5,67 +5,82 @@ import discord
 from typing import (
     Any,
     Callable,
-    TYPE_CHECKING,
+    ClassVar,
     Dict,
     Generic,
+    List,
+    Literal,
     Optional,
+    overload,
     Type,
-    TypeVar
+    TypeVar,
+    TYPE_CHECKING,
+    Union,
+
 )
 
-from discord.utils import escape_dict
-__all__ = (
-    'UserCommand'
-)
 
 from discord.interactions import Interaction
+from discord.utils import escape_dict, escape_list
+from .slash_options import SlashCommandOption
 
-from ..errors import *
+
+from .errors import *
 
 if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec, TypeGuard
 
     from discord.message import Message
 
-    from .._types import (
+    from ._types import (
         Coro,
         CoroFunc,
         Check,
         Hook,
         Error,
     )
-    from ..core import _CaseInsensitiveDict
+    from .core import _CaseInsensitiveDict
 
 if TYPE_CHECKING:
     P = ParamSpec('P')
 else:
     P = TypeVar('P')
 
-from .._types import _BaseUserCommand
+from enum import Enum
 
+from ._types import _BaseSlashCommand
+
+__all__ = (
+    'SlashCommand',
+    'SlashCommandOption'
+)
+
+
+MISSING: Any = discord.utils.MISSING
 
 
 T = TypeVar('T')
-UserCommandT = TypeVar('UserCommandT', bound='UserCommand')
+SlashCommandT = TypeVar('SlashCommandT', bound='SlashCommand')
 InteractionT = TypeVar('InteractionT', bound='Interaction')
 
 
-class UserCommand(_BaseUserCommand, Generic[P, T]):
 
-    r"""A class that implements the protocol for a bot user command.
+class SlashCommand(_BaseSlashCommand, Generic[P, T]):
+    r"""A class that implements the protocol for a bot slash command.
 
     These are not created manually, instead they are created via the
     decorator or functional interface.
 
-    Attributes
+    Key word arguments
     -----------
     name: :class:`str`
         The name of the command.
     description: :class:`str`
-        An optional description.
-        This will not show with the command in the context menu.
+        The description to appear with the slash command.
+        The message prefixed into the default help command.
     callback: :ref:`coroutine <coroutine>`
-        The coroutine that is executed when the user command is called.
+        The coroutine that is executed when the slash command is called.
+
     help: Optional[:class:`str`]
         The long help text for the command.
     brief: Optional[:class:`str`]
@@ -77,8 +92,8 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     allowed_roles: Optional[Dict[:class:`int`, :class:`bool`]]
         A mapping of role ids to a boolean value for wether users with those roles should be allowed to use the command or not 
     extras: :class:`dict`
-        A dict of user provided extras to attach to the UserCommand. 
-        
+        A dict of user provided extras to attach to the SlashCommand. 
+
         .. note::
             This object may be copied by the library.
 
@@ -87,7 +102,7 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     """
     __original_kwargs__: Dict[str, Any]
 
-    def __new__(cls: Type[UserCommandT], *args: Any, **kwargs: Any) -> UserCommandT:
+    def __new__(cls: Type[SlashCommandT], *args: Any, **kwargs: Any) -> SlashCommandT:
         self = super().__new__(cls)
         self.__original_kwargs__ = kwargs.copy()
         return self
@@ -104,7 +119,7 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         name = kwargs.get('name') or func.__name__
         if not isinstance(name, str):
             raise TypeError('Name of a command must be a string.')
-        self.name: str = name
+        self.name: str = name.lower()
 
         self.callback = func
 
@@ -123,6 +138,9 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
         self.extras: Dict[str, Any] = kwargs.get('extras', {})
         self.allowed_users: Dict[int, bool] = kwargs.get('allowed_users', {})
         self.allowed_roles: Dict[int, bool] = kwargs.get('allowed_roles', {})
+        self._is_sub_command: bool = kwargs.get('is_sub', False)
+        self._is_sub_sub_command: bool = kwargs.get('is_sub_sub', False)
+        self.autocomplete_callback = None
         
         description = kwargs.get('description') or self.name
 
@@ -134,9 +152,36 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
 
         self.description = inspect.cleandoc(description)
 
+
+        self._options: List[SlashCommandOption] = []
+
+        options = kwargs.get('options')
+        if options:
+            if not isinstance(options, list):
+                raise TypeError('Options must be a list of discord.SlashCommandOptions')
+            
+            if not all(isinstance(x, SlashCommandOption) for x in options):
+                raise TypeError('Options must be a list of discord.SlashCommandOptions')
+            
+            self._options = options
         self._id: int = 0
         
 
+    def on_autocomplete(self) -> Callable:
+        def inner(func: Callable) -> SlashCommand:
+            self.autocomplete_callback = func
+        return inner
+    
+    @overload
+    def raw_command(cls, name:str, **attrs) -> SlashCommand: ...
+
+    @classmethod
+    def raw_command(cls, **kwargs) -> Callable:
+        def inner(func: Callable) -> SlashCommand:
+            command = SlashCommand(func, is_sub=True, **kwargs)
+            return command
+
+        return inner
 
     @property
     def id(self):
@@ -145,13 +190,14 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
     @property
     def options(self):
         return self._options
-
-
-    @property 
+    
+    @property
     def json(self):
         json_ = {
-            "type":2,
-            "name":self.name
+            "type":1,
+            "name": self.name,
+            "description": self.description,
+            "options": [i.json for i in self.options]
         }
         return escape_dict(json_)
 
@@ -181,6 +227,3 @@ class UserCommand(_BaseUserCommand, Generic[P, T]):
 
         if len(json_): return escape_list(json_)
         else: return None 
-
-
-

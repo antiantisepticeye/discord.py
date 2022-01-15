@@ -56,7 +56,11 @@ from .cog import Cog
 from .context import Context
 
 from discord.interactions import Interaction
-from .application_commands import SlashCommandOption, SlashCommand, MessageCommand, UserCommand, SlashCommandGroup
+from .message_command import MessageCommand
+from .slash_command import SlashCommand
+from .slash_command_group import SlashCommandGroup, SlashSubGroup
+from .user_command import UserCommand
+from .slash_options import SlashCommandOption, InteractionDataOption
 from ._types import _BaseCommand
 
 if TYPE_CHECKING:
