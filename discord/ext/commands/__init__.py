@@ -17,5 +17,4 @@ from .converter import *
 from .cooldowns import *
 from .cog import *
 from .flags import *
-from .application_commands.slash_command_group import *
-from .application_commands.slash_options import *
+from .application_commands import *
