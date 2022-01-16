@@ -287,28 +287,31 @@ class BotBase(GroupMixin):
         
         return command
 
-    def __parse_slash_options(self, command: SlashCommand, options:list, guild:discord.Guild):
-
+    def __parse_slash_options(self, command: SlashCommand, options:List[Dict], guild:discord.Guild):
 
         parsed_opts = []
         option_types = SlashCommandOptionTypes
         for option in options:
             type =  option['type']
+            if type == 1 or type == 2:
+                if option.get('options'): return self.__parse_slash_options(command, option['options'], guild)
+                else: return []
             value = option['value']
             
-            if type == option_types.user:
+            if type == option_types.user.value:
                 option['value'] = self.get_user(int(value))
                 
-            elif type == option_types.channel:
+            elif type == option_types.channel.value:
                 option['value'] = guild.get_channel(int(value))
             
-            elif type == option_types.role:
+            elif type == option_types.role.value:
                 option['value'] = guild.get_role(int(value))
 
             option['type'] = try_enum(SlashCommandOptionTypes, type)
             parsed_opts.append(InteractionDataOption(option))
             
         return parsed_opts 
+
 
 
 
