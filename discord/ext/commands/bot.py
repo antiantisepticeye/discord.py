@@ -318,7 +318,7 @@ class BotBase(GroupMixin):
 
         final_opts = []
         for i in command.options:
-            final_opts.append(parsed_opts.get(i.name, MISSING))
+            final_opts.append(parsed_opts.get(i.name, i.default))
 
         return final_opts
 

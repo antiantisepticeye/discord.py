@@ -2,6 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, TypedDict
 import discord
+from discord.abc import MISSING
 from discord.enums import SlashCommandOptionTypes
 from discord.utils import escape_dict
 
@@ -29,7 +30,7 @@ class InteractionDataOption:
 class SlashCommandOption:
     Types = SlashCommandOptionTypes
 
-    def __init__(self, name: str, description: str, type_: SlashCommandOptionTypes=3, required:bool=True, choices:List[Choices]=[], min_value: Union[int, float]=None, max_value: Union[int, float]=None, channel_types: List[discord.enums.ChannelType]=[], autocomplete=False):
+    def __init__(self, name: str, description: str, type_: SlashCommandOptionTypes=3, required:bool=True, choices:List[Choices]=[], min_value: Union[int, float]=None, max_value: Union[int, float]=None, channel_types: List[discord.enums.ChannelType]=[], autocomplete=False, default=MISSING):
 
         if not isinstance(name, str): 
             raise TypeError('Name of option must be of type string')
@@ -50,6 +51,7 @@ class SlashCommandOption:
         self.max_value = max_value
         self.channel_types = channel_types
         self.autocomplete = autocomplete
+        self.default = default
 
     @property
     def json(self):
