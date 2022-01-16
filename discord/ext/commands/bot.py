@@ -276,7 +276,7 @@ class BotBase(GroupMixin):
         parsed_opts = {}
         
         options:List[Dict] = interaction.data.get('options', [])
-        print(options)
+        
         def parse_opts(options):
             for option in options:
                 type =  option['type']
@@ -304,7 +304,7 @@ class BotBase(GroupMixin):
                 parsed_opts[option["name"]] = InteractionDataOption(option)
             final_opts = []
             for i in command.options:
-                print(i,InteractionDataOption.from_slash_option(i))
+                
                 d =  InteractionDataOption.from_slash_option(i)
                 final_opts.append(parsed_opts.get(i.name, d))
 
