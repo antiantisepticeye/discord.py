@@ -18,14 +18,20 @@ class Choices(TypedDict):
 class InteractionDataOption:
     name: str
     type: SlashCommandOptionTypes
-    value: Optional[Union[str,int,float]]
-    options: Optional[List[InteractionDataOption]]
+    value: Optional[Union[str,int,float, discord.Role, discord.User, discord.ChannelType]]
 
     def __init__(self, payload: Dict[str, Any]) -> None:
         for key, val in payload.items():
             setattr(self, key, val)
     def __repr__(self) -> str:
         return f'<discordext.commands.InteractionDataOption name={repr(self.name)} value={repr(self.value)}>'
+
+    def from_slash_option(self, option:SlashCommandOption) -> InteractionDataOption:
+        return InteractionDataOption({
+            "name":option.name,
+            "type":option.type,
+            "value":option.default
+        })
 
 class SlashCommandOption:
     Types = SlashCommandOptionTypes

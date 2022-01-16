@@ -314,11 +314,12 @@ class BotBase(GroupMixin):
                 option_value = guild.get_role(int(option_value))
 
             option['type'] = try_enum(SlashCommandOptionTypes, type)
-            parsed_opts[option["name"]] = option_value
+            option["value"]= option_value
+            parsed_opts[option["name"]] = InteractionDataOption(option)
 
         final_opts = []
         for i in command.options:
-            final_opts.append(parsed_opts.get(i.name, i.default))
+            final_opts.append(parsed_opts.get(i.name, InteractionDataOption.from_slash_option(i)))
 
         return final_opts
 
