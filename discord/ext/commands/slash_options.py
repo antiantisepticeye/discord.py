@@ -26,8 +26,9 @@ class InteractionDataOption:
     def __repr__(self) -> str:
         return f'<discordext.commands.InteractionDataOption name={repr(self.name)} value={repr(self.value)}>'
 
-    def from_slash_option(self, option:SlashCommandOption) -> InteractionDataOption:
-        return InteractionDataOption({
+    @classmethod
+    def from_slash_option(cls, option:SlashCommandOption) -> InteractionDataOption:
+        return cls({
             "name":option.name,
             "type":option.type,
             "value":option.default
