@@ -198,7 +198,7 @@ class BotBase(GroupMixin):
                         else:
                             args = [group, interaction]  
                     try:
-                        command.callback(*args)
+                        await command.callback(*args)
                     except Exception as e:                    
                         self.dispatch('interaction_command_error', interaction, e)
 
