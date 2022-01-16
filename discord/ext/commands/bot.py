@@ -286,7 +286,7 @@ class BotBase(GroupMixin):
         
         return command
 
-    def __parse_slash_options(self, command: SlashCommand, interaction:discord.Interaction, guild:discord.Guild) -> List[Union[discord.User, discord.Role, discord.ChannelType, str, int, bool, MISSING]]:
+    def __parse_slash_options(self, command: SlashCommand, interaction:discord.Interaction) -> List[Union[discord.User, discord.Role, discord.ChannelType, str, int, bool, MISSING]]:
 
         parsed_opts = {}
         
@@ -306,11 +306,11 @@ class BotBase(GroupMixin):
                 option_value = self.get_user(int(option_value))
                 
             elif type == SlashCommandOptionTypes.channel.value:
-                
+                guild = interaction.guild
                 option_value = guild.get_channel(int(option_value))
             
             elif type == SlashCommandOptionTypes.role.value:
-                
+                guild = interaction.guild
                 option_value = guild.get_role(int(option_value))
 
             option['type'] = try_enum(SlashCommandOptionTypes, type)
