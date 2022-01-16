@@ -178,37 +178,36 @@ class BotBase(GroupMixin):
             if interaction.type is discord.InteractionType.application_command:
                 
                 command_type = int(interaction.data['type'])
-                if command_type == 1:    # type 1 being a slash command
-                    command, group = self.__resolve_slash_command(interaction)   # gets slash command based on the interaction
-                    interaction_options = interaction.data.get('options')           # get slash command options if any
+                if command_type == 1:
+                    command, group = self.__resolve_slash_command(interaction)
 
                     if group is None:
-                        if interaction_options and command.options:                     # check if interaction response and command both have options
+                        if command.options:
                             
-                            opts = self.__parse_slash_options(command, interaction_options, interaction.guild)  # get command options as a list
-                            await command.callback(interaction, *opts)                  # run the command with list as arguments
+                            opts = self.__parse_slash_options(command, interaction)
+                            await command.callback(interaction, *opts)
 
-                        else:                                                           # else just run the command without any other arguments
+                        else:
                             await command.callback(interaction)  
                     else:
-                        if interaction_options and command.options:                     # check if interaction response and command both have options
+                        if command.options:
                             
-                            opts = self.__parse_slash_options(command, interaction_options, interaction.guild)  # get command options as a list
-                            await command.callback(group, interaction, *opts)                  # run the command with list as arguments
+                            opts = self.__parse_slash_options(command, interaction)
+                            await command.callback(group, interaction, *opts)
 
-                        else:                                                           # else just run the command without any other arguments
+                        else:
                             await command.callback(group, interaction)  
 
 
-                elif command_type == 2:     # if command type 2, being a user command
-                    command = self.__resolve_user_command(interaction)      # get command based on interaction
-                    user = self.get_user(int(interaction.data['target_id']))     # get user
-                    await command.callback(interaction, user)    # run command with user as argument
+                elif command_type == 2:
+                    command = self.__resolve_user_command(interaction) 
+                    user = self.get_user(int(interaction.data['target_id'])) 
+                    await command.callback(interaction, user)
 
-                elif command_type == 3:     # if command type 3, being a message command
-                    command = self.__resolve_message_command(interaction)       # get command based on interaction
-                    message = await interaction.channel.fetch_message(int(interaction.data['target_id']))       # get message 
-                    await command.callback(interaction, message)     # run command with message as argument
+                elif command_type == 3:
+                    command = self.__resolve_message_command(interaction)
+                    message = await interaction.channel.fetch_message(int(interaction.data['target_id']))
+                    await command.callback(interaction, message)
             elif interaction.type is discord.InteractionType.autocomplete:
                 command, group = self.__resolve_slash_command(interaction)
                 if(command.autocomplete_callback):
@@ -287,30 +286,41 @@ class BotBase(GroupMixin):
         
         return command
 
-    def __parse_slash_options(self, command: SlashCommand, options:List[Dict], guild:discord.Guild):
+    def __parse_slash_options(self, command: SlashCommand, interaction:discord.Interaction, guild:discord.Guild) -> List[Union[discord.User, discord.Role, discord.ChannelType, str, int, bool, MISSING]]:
 
-        parsed_opts = []
-        option_types = SlashCommandOptionTypes
+        parsed_opts = {}
+        
+        options:List[Dict] = interaction.data.get('options', [])
+        
         for option in options:
             type =  option['type']
+
             if type == 1 or type == 2:
                 if option.get('options'): return self.__parse_slash_options(command, option['options'], guild)
                 else: return []
-            value = option['value']
             
-            if type == option_types.user.value:
-                option['value'] = self.get_user(int(value))
+            option_value = option['value']
+            
+            if type == SlashCommandOptionTypes.user.value:
+
+                option_value = self.get_user(int(option_value))
                 
-            elif type == option_types.channel.value:
-                option['value'] = guild.get_channel(int(value))
+            elif type == SlashCommandOptionTypes.channel.value:
+                
+                option_value = guild.get_channel(int(option_value))
             
-            elif type == option_types.role.value:
-                option['value'] = guild.get_role(int(value))
+            elif type == SlashCommandOptionTypes.role.value:
+                
+                option_value = guild.get_role(int(option_value))
 
             option['type'] = try_enum(SlashCommandOptionTypes, type)
-            parsed_opts.append(InteractionDataOption(option))
-            
-        return parsed_opts 
+            parsed_opts[option["name"]] = option_value
+
+        final_opts = []
+        for i in command.options:
+            final_opts.append(parsed_opts.get(i.name, MISSING))
+
+        return final_opts
 
 
 
