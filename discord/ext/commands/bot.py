@@ -400,7 +400,7 @@ class BotBase(GroupMixin):
             raise errors.ExtensionFailed(key, e) from e
 
 
-    def load_slash_group_module(self, name: str, *, package: Optional[str] = None) -> None:
+    def load_slash_module(self, name: str, *, package: Optional[str] = None) -> None:
         name = self._resolve_name(name, package)
         if name in [i.name for i in self.all_global_application_commands.all_slash_command_group]:
             raise errors.ExtensionAlreadyLoaded(name)

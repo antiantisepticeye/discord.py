@@ -21,4 +21,4 @@ from .message_command import MessageCommand
 from .slash_command import SlashCommand
 from .slash_command_group import SlashCommandGroup, SlashSubGroup
 from .user_command import UserCommand
-from .slash_options import SlashCommandOption, InteractionDataOption
+from .slash_options import SlashCommandOption, InteractionDataOption, SlashCommandOptionTypes
