@@ -353,7 +353,6 @@ class BotBase(GroupMixin):
                 cmd_name = str(command_data['name'])
         
 
-                print(f'checking command {cmd_name!r} in {guild_id!r} {cmd_id!r}') 
 
                 guild_commands = self.all_guild_application_commands[guild_id]
                 cmd = guild_commands.get_by_name(cmd_name)

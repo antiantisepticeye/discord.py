@@ -65,7 +65,6 @@ class SlashCommandOption:
             "autocomplete": self.autocomplete,
         }
         json_ = escape_dict(json_)
-        print(json_)
         return json_
         
 

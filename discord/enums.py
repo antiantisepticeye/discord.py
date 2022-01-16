@@ -191,7 +191,6 @@ class ChannelType(Enum):
     
     
 
-print(ChannelType.text.__class__.__name__)
 
 class MessageType(Enum):
     default = 0
