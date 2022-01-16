@@ -271,59 +271,45 @@ class BotBase(GroupMixin):
         if command is None: raise Exception("command not found")
         
         return command
-
-    def __resolve_message_command(self, interaction:discord.Interaction) -> MessageCommand:
-        command = None
-        id = int(interaction.data['id'])
-        name = str(interaction.data['name'])
-        command = discord.utils.get(self.all_global_application_commands.all_message_commands, id=id) or discord.utils.get(self.all_global_application_commands.all_message_commands, name=name)
-        if command is None: 
-            guild_commands = self.all_guild_application_commands.get(int(interaction.guild_id))
-            if guild_commands:
-                command = discord.utils.get(guild_commands.all_message_commands, id=id) or discord.utils.get(guild_commands.all_message_commands, name=name)
-        
-        if command is None: raise Exception("command not found")
-        
-        return command
-
     def __parse_slash_options(self, command: SlashCommand, interaction:discord.Interaction) -> List[Union[discord.User, discord.Role, discord.ChannelType, str, int, bool, MISSING]]:
-
+    
         parsed_opts = {}
         
         options:List[Dict] = interaction.data.get('options', [])
-        
-        for option in options:
-            type =  option['type']
+        print(options)
+        def parse_opts(options):
+            for option in options:
+                type =  option['type']
 
-            if type == 1 or type == 2:
-                if option.get('options'): return self.__parse_slash_options(command, option['options'], guild)
-                else: return []
-            
-            option_value = option['value']
-            
-            if type == SlashCommandOptionTypes.user.value:
+                if type == 1 or type == 2:
+                    return parse_opts(option.get('options', []))
 
-                option_value = self.get_user(int(option_value))
                 
-            elif type == SlashCommandOptionTypes.channel.value:
-                guild = interaction.guild
-                option_value = guild.get_channel(int(option_value))
-            
-            elif type == SlashCommandOptionTypes.role.value:
-                guild = interaction.guild
-                option_value = guild.get_role(int(option_value))
+                option_value = option['value']
+                
+                if type == SlashCommandOptionTypes.user.value:
 
-            option['type'] = try_enum(SlashCommandOptionTypes, type)
-            option["value"]= option_value
-            parsed_opts[option["name"]] = InteractionDataOption(option)
+                    option_value = self.get_user(int(option_value))
+                    
+                elif type == SlashCommandOptionTypes.channel.value:
+                    guild = interaction.guild
+                    option_value = guild.get_channel(int(option_value))
+                
+                elif type == SlashCommandOptionTypes.role.value:
+                    guild = interaction.guild
+                    option_value = guild.get_role(int(option_value))
 
-        final_opts = []
-        for i in command.options:
-            final_opts.append(parsed_opts.get(i.name, InteractionDataOption.from_slash_option(i)))
+                option['type'] = try_enum(SlashCommandOptionTypes, type)
+                option["value"]= option_value
+                parsed_opts[option["name"]] = InteractionDataOption(option)
+            final_opts = []
+            for i in command.options:
+                print(i,InteractionDataOption.from_slash_option(i))
+                d =  InteractionDataOption.from_slash_option(i)
+                final_opts.append(parsed_opts.get(i.name, d))
 
-        return final_opts
-
-
+            return final_opts
+        return parse_opts(options)
 
 
     async def _deploy_application_commands(self, *args,**kwargs):
