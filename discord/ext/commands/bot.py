@@ -180,24 +180,27 @@ class BotBase(GroupMixin):
                 command_type = int(interaction.data['type'])
                 if command_type == 1:
                     command, group = self.__resolve_slash_command(interaction)
-
+                    args = []
                     if group is None:
                         if command.options:
                             
                             opts = self.__parse_slash_options(command, interaction)
-                            await command.callback(interaction, *opts)
+                            args = [interaction] + opts
 
                         else:
-                            await command.callback(interaction)  
+                            args = [interaction] 
                     else:
                         if command.options:
                             
                             opts = self.__parse_slash_options(command, interaction)
-                            await command.callback(group, interaction, *opts)
+                            args = [group, interaction] + opts
 
                         else:
-                            await command.callback(group, interaction)  
-
+                            args = [group, interaction]  
+                    try:
+                        command.callback(*args)
+                    except Exception as e:                    
+                        self.dispatch('interaction_command_error', interaction, e)
 
                 elif command_type == 2:
                     command = self.__resolve_user_command(interaction) 
