@@ -1463,14 +1463,13 @@ class GroupMixin(Generic[CogT]):
 
         if guild is None:
             self.all_global_application_commands.add_command(command)
-            print(f'adding global command {command.name}')
-
+            
         else:
             if guild in self.all_guild_application_commands:
                 if command.name in self.all_guild_application_commands[guild].all_slash_commands:
                     raise CommandRegistrationError(command.name)
 
-            print(f'adding guild command {command.name!r} to {guild=!r}')
+
             if self.all_guild_application_commands.get(guild):
                 self.all_guild_application_commands[guild].add_command(command)
             else:
