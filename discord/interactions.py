@@ -464,6 +464,7 @@ class InteractionResponse:
         embeds: List[Embed] = MISSING,
         view: View = MISSING,
         tts: bool = False,
+        files: List[File]=[]
         ephemeral: bool = False,
     ) -> None:
         """|coro|
@@ -534,6 +535,7 @@ class InteractionResponse:
             parent.token,
             session=parent._session,
             type=InteractionResponseType.channel_message.value,
+            files=files,
             data=payload,
         )
 
