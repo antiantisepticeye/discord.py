@@ -341,6 +341,40 @@ class AsyncWebhookAdapter:
         route = Route('GET', '/webhooks/{webhook_id}/{webhook_token}', webhook_id=webhook_id, webhook_token=token)
         return self.request(route, session=session)
 
+    def send_multipart_helper(
+        self,
+        route: Route,
+        session,
+        files:Sequence[File]=None,
+        payload=None
+    ) -> Response[message.Message]:
+        form = []
+
+        form.append({'name': 'payload_json', 'value': utils._to_json(payload)})
+        if len(files) == 1:
+            file = files[0]
+            form.append(
+                {
+                    'name': 'file',
+                    'value': file.fp,
+                    'filename': file.filename,
+                    'content_type': 'application/octet-stream',
+                }
+            )
+        else:
+            for index, file in enumerate(files):
+                form.append(
+                    {
+                        'name': f'file{index}',
+                        'value': file.fp,
+                        'filename': file.filename,
+                        'content_type': 'application/octet-stream',
+                    }
+                )
+
+        return self.request(route, session=session, multipart=form, files=files)
+
+
     def create_interaction_response(
         self,
         interaction_id: int,
@@ -349,6 +383,7 @@ class AsyncWebhookAdapter:
         session: aiohttp.ClientSession,
         type: int,
         data: Optional[Dict[str, Any]] = None,
+        files: Optional[List[File]] = None,
     ) -> Response[None]:
         payload: Dict[str, Any] = {
             'type': type,
@@ -363,8 +398,15 @@ class AsyncWebhookAdapter:
             webhook_id=interaction_id,
             webhook_token=token,
         )
-
-        return self.request(route, session=session, payload=payload)
+        if files:
+            return self.send_multipart_helper(
+                route,
+                session,
+                files=files,
+                payload=payload,
+            )
+        else:
+            return self.request(route, session=session, payload=payload)
 
     def get_original_interaction_response(
         self,
