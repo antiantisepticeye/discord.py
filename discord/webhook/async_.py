@@ -30,7 +30,7 @@ import json
 import re
 
 from urllib.parse import quote as urlquote
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, TYPE_CHECKING, Tuple, Union, overload
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, TYPE_CHECKING, Tuple, Union, overload, Sequence
 from contextvars import ContextVar
 
 import aiohttp
@@ -347,7 +347,7 @@ class AsyncWebhookAdapter:
         session,
         files:Sequence[File]=None,
         payload=None
-    ) -> Response[message.Message]:
+    ) -> Response[Message]:
         form = []
 
         form.append({'name': 'payload_json', 'value': utils._to_json(payload)})
