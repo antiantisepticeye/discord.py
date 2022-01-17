@@ -28,6 +28,8 @@ from typing import Callable, Dict, Iterable, List, Optional, Union, TYPE_CHECKIN
 import time
 import asyncio
 
+from .invite import Invite
+
 
 from .mixins import Hashable
 from .abc import Messageable
@@ -57,71 +59,63 @@ if TYPE_CHECKING:
 
 
 class ScheduledEvent(Hashable):
-#region to be checked
+    
     """Represents a Discord guild's scheduled Event.
 
     .. container:: operations
 
         .. describe:: x == y
 
-            Checks if two threads are equal.
+            Checks if two events are equal.
 
         .. describe:: x != y
 
-            Checks if two threads are not equal.
+            Checks if two events are not equal.
 
         .. describe:: hash(x)
 
-            Returns the thread's hash.
+            Returns the event's hash.
 
         .. describe:: str(x)
 
-            Returns the thread's name.
+            Returns the event's name.
     .. versionadded:: 2.0
 
     Attributes
     -----------
     name: :class:`str`
         The thread name.
-    guild: :class:`Guild`
-        The guild the thread belongs to.
+    description: :class:`str`
+        the event description
     id: :class:`int`
         The thread ID.
-    parent_id: :class:`int`
-        The parent :class:`TextChannel` ID this thread belongs to.
-    owner_id: :class:`int`
-        The user's ID that created this thread.
-    last_message_id: Optional[:class:`int`]
-        The last message ID of the message sent to this thread. It may
-        *not* point to an existing or valid message.
-    slowmode_delay: :class:`int`
-        The number of seconds a member must wait between sending messages
-        in this thread. A value of `0` denotes that it is disabled.
-        Bots and users with :attr:`~Permissions.manage_channels` or
-        :attr:`~Permissions.manage_messages` bypass slowmode.
-    message_count: :class:`int`
-        An approximate number of messages in this thread. This caps at 50.
-    member_count: :class:`int`
-        An approximate number of members in this thread. This caps at 50.
-    me: Optional[:class:`ThreadMember`]
-        A thread member representing yourself, if you've joined the thread.
-        This could not be available.
-    archived: :class:`bool`
-        Whether the thread is archived.
-    locked: :class:`bool`
-        Whether the thread is locked.
-    invitable: :class:`bool`
-        Whether non-moderators can add other non-moderators to this thread.
-        This is always ``True`` for public threads.
-    archiver_id: Optional[:class:`int`]
-        The user's ID that archived this thread.
-    auto_archive_duration: :class:`int`
-        The duration in minutes until the thread is automatically archived due to inactivity.
-        Usually a value of 60, 1440, 4320 and 10080.
-    archive_timestamp: :class:`datetime.datetime`
-        An aware timestamp of when the thread's archived status was last updated in UTC.
+    start_time: :class:`datetime.datetime`
+        An timestamp of when the event starts in UTC.
+    end_time: :class:`datetime.datetime`
+        An timestamp of when the event ends in UTC.
+    status: :class:`EventStatusType`
+        The status of the event, wether it is scheduled, active, completed or cancelled.
+    guild: :class:`Guild`
+        The guild the event belongs to.
+    guild_id: :class:`int`
+        The guild's ID the event belongs to.
+    user_count: :class:`int`
+        The number of people interested in the event.
+    is_guild_only: :class:`bool`
+        Wethter the event is only visible to guild members.
+    creator_id: :class:`int`
+        The user's ID who created the event.
+    type: :class:`EventEntityType`
+        The type of the event.
+    channel_id: Optional[:class:`int`]
+        The associated :class:`StageChannel` or :class:`VoiceChannel` ID if any.
+    entity_metadata: Dict[:class:`str`, Any]
+        The raw metadata about the event, usually just containing the location if present.
+    location: Optional[:class:`str`]
+        The location string of the event if present.
+
     """
-#endregion
+
     __slots__ = (
         'name',
         'description',
@@ -130,25 +124,24 @@ class ScheduledEvent(Hashable):
         'end_time',
         'status',
         'id',
-        'guild',
         'user_count',
         'is_guild_only',
         'creator_id',
         'type',
         'channel_id',
+        'guild_id',
         'entity_metadata',
         'location'
     )
 
-    def __init__(self, *, data: ScheduledEventPayload, guild: Guild, state: ConnectionState):
+    def __init__(self, *, data: ScheduledEventPayload, state: ConnectionState):
         self._state: ConnectionState = state
-        self.guild = guild
-
         self.id = int(data['id'])
         self.name: str = data['name']
         self.start_time: datetime.datetime = parse_time(data['scheduled_start_time'])
         self.status: EventStatusType = try_enum(EventStatusType, data['status'])
         self.is_guild_only: bool = data.get('privacy_level') == 2 or False
+        self.guild_id: int = data["guild_id"]
 
         self.description: str = data.get('description', None)
         self.user_count: int = data.get('user_count', None)
@@ -204,6 +197,10 @@ class ScheduledEvent(Hashable):
         if self.type in (EventEntityType.stage, EventEntityType.voice):
             return self._state.get_channel(self.channel_id)
 
+    @property
+    def guild(self) -> Guild:
+        return self._state._get_guild(self.guild_id)
+
     async def fetch_users(self) -> Sequence[User]:
         """|coro|
 
@@ -224,9 +221,17 @@ class ScheduledEvent(Hashable):
             All users subscribed to the event.
         """
         data = await self._state.http.get_scheduled_event_users(self.guild.id, self.id)
-
-
         return [User(state=self._state, data=d['user']) for d in data]
 
+    def create_invite_url(self) -> str:
+        return f"https://discord.com/events/{self.guild_id}/{self.id}"
+
+    async def create_invite(self, channel: Union[StageChannel, VoiceChannel]=None, **invite_options) -> Invite:
+        payload = {}
+        channel = channel or self.channel or self.guild.rules_channel or self.guild.channels[0]
+
+        invite = await channel.create_invite(**invite_options)
+        invite.event = self        
+        return invite
 
 

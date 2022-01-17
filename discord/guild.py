@@ -471,7 +471,7 @@ class Guild(Hashable):
                 self._add_member(member)
 
         for e in guild.get('guild_scheduled_events', []):
-            scheduled_event = ScheduledEvent(guild=self, data=e, state=state)
+            scheduled_event = ScheduledEvent(data=e, state=state)
             self._scheduled_events[scheduled_event.id] = scheduled_event
 
         self._sync(guild)

@@ -25,6 +25,8 @@ DEALINGS IN THE SOFTWARE.
 from __future__ import annotations
 
 from typing import List, Optional, Type, TypeVar, Union, TYPE_CHECKING
+
+from discord.types.schedule_event import ScheduledEvent
 from .asset import Asset
 from .utils import parse_time, snowflake_time, _get_as_snowflake
 from .object import Object
@@ -317,6 +319,7 @@ class Invite(Hashable):
         'max_uses',
         'inviter',
         'channel',
+        'event',
         'target_user',
         'target_type',
         '_state',
@@ -347,6 +350,8 @@ class Invite(Hashable):
         self.max_uses: Optional[int] = data.get('max_uses')
         self.approximate_presence_count: Optional[int] = data.get('approximate_presence_count')
         self.approximate_member_count: Optional[int] = data.get('approximate_member_count')
+        ev = data.get('guild_scheduled_event')
+        self.event: Optional[ScheduledEvent] = ScheduledEvent(data=ev, state=state) if ev else None
 
         expires_at = data.get('expires_at', None)
         self.expires_at: Optional[datetime.datetime] = parse_time(expires_at) if expires_at else None
@@ -451,7 +456,7 @@ class Invite(Hashable):
     @property
     def url(self) -> str:
         """:class:`str`: A property that retrieves the invite URL."""
-        return self.BASE + '/' + self.code
+        return self.BASE + '/' + self.code + (f"?event={self.event.id}" if self.event else '')
 
     async def delete(self, *, reason: Optional[str] = None):
         """|coro|
