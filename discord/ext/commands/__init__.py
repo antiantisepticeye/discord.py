@@ -9,6 +9,7 @@ An extension module to facilitate creation of bot commands.
 """
 
 from .bot import *
+from .application_bot import *
 from .context import *
 from .core import *
 from .errors import *
